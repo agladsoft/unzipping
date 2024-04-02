@@ -17,8 +17,9 @@ class JsonEncoder(json.JSONEncoder):
 
 
 class DataExtractor:
-    def __init__(self, filename):
+    def __init__(self, filename, directory):
         self.filename = filename
+        self.directory = directory
         self.dict_columns_position: Dict[str, Optional[int]] = {
             "model": None,
             "number_pp": None,
@@ -67,8 +68,8 @@ class DataExtractor:
         """
         Bringing the header column to a unified form.
         """
+        row: str = re.sub(r"\n", " ", row).strip() if row else row
         row: str = re.sub(r" +", " ", row).strip() if row else row
-        row: str = re.sub(r"\n", "", row).strip() if row else row
         return row
 
     @staticmethod
@@ -96,7 +97,9 @@ class DataExtractor:
         :return:
         """
         basename = os.path.basename(self.filename)
-        output_file_path = os.path.join("data", f'{basename}.json')
+        dir_name = os.path.join(self.directory, 'json')
+        os.makedirs(dir_name, exist_ok=True)
+        output_file_path = os.path.join(dir_name, f'{basename}.json')
         with open(output_file_path, 'w', encoding='utf-8') as f:
             json.dump(list_data, f, ensure_ascii=False, indent=4, cls=JsonEncoder)
 
@@ -111,8 +114,7 @@ class DataExtractor:
                     if column == column_eng:
                         self.dict_columns_position[DICT_HEADERS_COLUMN_ENG[columns]] = index
 
-    @staticmethod
-    def _get_content_before_table(rows: list, context: dict) -> Dict[str, str]:
+    def _get_content_before_table(self, rows: list, context: dict) -> Dict[str, str]:
         """
         Getting the date, ship name and voyage in the cells before the table.
         :param rows:
@@ -129,8 +131,9 @@ class DataExtractor:
                                 break
                             if not cell:
                                 continue
-                            context[DICT_LABELS[columns]] = cell.strip() \
-                                if not context.get(DICT_LABELS[columns]) else context[DICT_LABELS[columns]]
+                            cell = self._remove_symbols_in_columns(cell)
+                            context[DICT_LABELS[columns]] = context[DICT_LABELS[columns]] \
+                                if context.get(DICT_LABELS[columns]) else cell
 
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
         """
@@ -169,9 +172,12 @@ class DataExtractor:
 
 
 class ArchiveExtractor:
-    def __init__(self):
+    def __init__(self, directory):
         self.logger: logging.getLogger = get_logger(os.path.basename(__file__).replace(".py", "_")
                                                     + str(datetime.now().date()))
+        self.root_directory = directory
+        self.dir_name = directory
+        self.current_dir = None
         self.extension_handlers = {
             '.xlsx': self.read_excel_file,
             '.xls': self.read_excel_file,
@@ -186,10 +192,10 @@ class ArchiveExtractor:
         :return:
         """
         self.logger.info(f"Найден файл Excel: {file_path}")
-        DataExtractor(file_path).main()
+        DataExtractor(file_path, self.root_directory).main()
+        self.dir_name = self.dir_name.replace(self.current_dir, '')
 
-    @staticmethod
-    def save_archive(archive, file_info):
+    def save_archive(self, archive, file_info):
         """
         Save the archive.
         :param archive:
@@ -199,9 +205,11 @@ class ArchiveExtractor:
         if file_info.is_dir():
             return
         extract_to = os.path.dirname(file_info.filename)
+        self.current_dir = extract_to
+        self.dir_name = os.path.join(self.dir_name, extract_to)
         inner_archive_file = archive.open(file_info.filename)
-        inner_archive_filename = os.path.join(extract_to, os.path.basename(file_info.filename))
-        os.makedirs(os.path.dirname(inner_archive_filename), exist_ok=True)
+        inner_archive_filename = os.path.join(self.dir_name, os.path.basename(file_info.filename))
+        os.makedirs(self.dir_name, exist_ok=True)
         with open(inner_archive_filename, 'wb') as f:
             f.write(inner_archive_file.read())
         inner_archive_file.close()
@@ -242,19 +250,19 @@ class ArchiveExtractor:
             handler(file_path)
         else:
             self.logger.info(f"Найден файл: {file_path}")
+            self.dir_name = self.dir_name.replace(self.current_dir, '')
 
-    def main(self, directory):
+    def main(self):
         """
         Main function.
-        :param directory:
         :return:
         """
-        for root, dirs, files in os.walk(directory):
+        for root, dirs, files in os.walk(self.dir_name):
             for file in files:
                 file_path = os.path.join(root, file)
                 self.process_archive(file_path)
 
 
 if __name__ == '__main__':
-    ArchiveExtractor().main('/home/timur/sambashare/unzipping')
-    # import sys; DataExtractor(sys.argv[1]).main()
+    # ArchiveExtractor('/home/timur/sambashare/unzipping').main()
+    import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
