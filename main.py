@@ -264,5 +264,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    # ArchiveExtractor('/home/timur/sambashare/unzipping').main()
-    import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
+    ArchiveExtractor('/home/timur/sambashare/unzipping').main()
+    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
