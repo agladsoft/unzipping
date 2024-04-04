@@ -12,13 +12,24 @@ COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
 
 DICT_LABELS: dict = {
     (
+        "Продавец",
         "Отправитель",
         "Отправитель / Продавец",
         "Продавец/Отправитель",
         "Shipper /Отправитель / 发货人",
-        "Отправитель /Shipper"
+        "Отправитель /Shipper",
+        "The Shipper / Отправитель",
+        "Shipper /Грузоотправитель",
+        "Отправитель / Продавец\nShipper / Seller",
+        "Отправитель/Продавец",
+        "Shipper /Отправитель",
+        "Отправитель/The Sender\n发货人",
+        "Отправитель/Shipper",
+        "Shipper/Отправитель",
+        "Отправитель по станции/ \nShipper in SMGS/\n运单发货人",
+        "The Sender/ Отправитель"
     ):
-        "sender",
+        "seller",
     (
         "Shipper/Seller",
         "Seller/Продавец/ 卖家",
@@ -26,7 +37,15 @@ DICT_LABELS: dict = {
         "ПродавецSeller",
         "Seller/Продавец/",
         "Seller / Продавец",
-        "Shipper / Seller"
+        "Shipper / Seller",
+        "The Seller / Продавец",
+        "Seller/Продавец",
+        "Продавец/The seller\n卖方",
+        "Consignor / Грузоотправитель/Продавец",
+        "Продавец /\nОтправитель\n\nSeller/\nShipper",
+        "Seller/ Продавец",
+        "Продавец/Seller\n卖家",
+        "The Seller/ Продавец"
     ):
         "seller_priority",
     (
@@ -40,10 +59,26 @@ DICT_LABELS: dict = {
         "ПокупательBuyer",
         "Buyer / Покупатель/",
         "Buyer / Покупатель",
-        "Buyer /"
+        "Buyer /",
+        "The Buyer / Покупатель",
+        "The Buyer",
+        "Покупатель/The buyer\n买方",
+        "Consignee / Грузополучатель/Покупатель",
+        "Получатель/",
+        "Покупатель/The buyer 买方",
+        "Покупатель/Buyer\n买家",
+        "The Buyer / Покупатель\nThe Consigneee/ Получатель"
     ):
         "buyer_priority",
-    ("Станция назначения",): "destination_station"
+    (
+        "Станция назначения",
+        "Place of delivery / Место доставки",
+        "Станция назначения / Destination station",
+        "Станция назначения \n(Destination station)",
+        "Place of delivery / Место доставки",
+        "Destination Station/\nСтанция назначения\n目的站"
+    ):
+        "destination_station"
 }
 
 DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
@@ -55,7 +90,11 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "No.",
         "No.编号",
         "Pll",
-        "№ п/п"
+        "№ п/п",
+        "No. / №",
+        "Номер",
+        "№",
+        "No. / №"
     ):
         "number_pp",
     (
@@ -67,30 +106,53 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "HS Code /",
         "HS Code /Код ТН ВЭД ТС",
         "HS code/Код ТНВЭД",
-        "Код ТН ВЭД"
+        "Код ТН ВЭД",
+        "Tariff code / Код товара в соответствии с ТН ВЭД",
+        "HS Code / 海关编码 Код ТН ВЭД ТС",
+        "Код ТН ВЭД ТС",
+        "Код товара в соответствии с ТН ВЭД",
+        "Код ТНВЭД",
+        "Tariff code / Код товара в  соответствии с ТН ВЭД"
     ):
         "tnved_code",
     (
         "Страна происхождения товара",
         "Country of origin/ Страна происхождения товара/ 商品原产国",
         "Страна происхождения товара 货源国",
-        "Country of origin / Страна происхождения товара"
+        "Country of origin / Страна происхождения товара",
+        "Country of Origin / Страна происхождения",
+        "Страна происхождения товара商品原产地",
+        "Страна происх.товара",
+        "Страна происхождения",
+        "Country of Origin / Страна происхождения"
     ):
         "country_of_origin",
     (
         "Описание товара",
+        "Описание товаров",
         "Описание товаров/description of goods",
         "Description of goods/ Описание товаров/货物名称",
         "Description of goods",
         "Описание товаров/description of goods 货物名，描述",
         "Description of goods /Описание товаров",
+        "Name of product / Наименование товара",
+        "Описание товаров/description of goods货物名称",
+        "Название",
+        "Наименование товара",
+        "Name of product / Наименование товара"
     ):
         "goods_description",
     (
         "Qty pcs / Кол-во шт",
         "Qty pcs / Кол-во шт/ 单件数量",
         "Qty pcs / Кол-во шт 单件数",
-        "Кол-во, шт"
+        "Кол-во, шт",
+        "Q-ty, pcs / Кол-во, штук",
+        "Quantity / Кол-во",
+        "Кол-во шт",
+        "Количество",
+        "Кол-во",
+        "Measurement units/ Ед. измерения"
     ):
         "quantity",
     (
@@ -99,7 +161,13 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Qty of packages/Кол-во мест, коробов 件数",
         "Qty places, boxes /Кол-во мест, коробок",
         "Quantity (meters) /Кол-во (метры)",
-        "Кол-во, мест"
+        "Кол-во, мест",
+        "Number of units load (cll.) / Кол-во мест",
+        "装箱数量Qty of packages/Кол-во мест",
+        "Кол-во мест, коробов",
+        "Количество штук",
+        "Кол-во мест",
+        "Number of packages/ Количество упаковок"
     ):
         "package_quantity",
     (
@@ -108,7 +176,12 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Net weight kg / Вес нетто кг 净重",
         "Net weight, kg / Вес нетто, кг",
         "NETT weight, KG",
-        "Вес НЕТТО,кг"
+        "Вес НЕТТО,кг",
+        "Net weight, kg / Вес нетто, кг",
+        "净重Net weight kg / Вес нетто кг",
+        "Вес нетто кг",
+        "Вес нетто, кг",
+        "Net weight, kg / Вес нетто, кг"
     ):
         "net_weight",
     (
@@ -117,7 +190,12 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Gross weight kg / Вес брутто кг 毛重",
         "Gross weight, kg /Вес брутто, кг",
         "GROSS weight, KG",
-        "Вес БРУТТО,кг"
+        "Вес БРУТТО,кг",
+        "Gross weight, kg / Вес  брутто, кг",
+        "毛重Gross weight kg / Вес брутто кг",
+        "Вес брутто кг",
+        "Вес брутто, кг",
+        "Gross weight, kg / Вес брутто,кг"
     ):
         "gross_weight",
     (
@@ -125,7 +203,12 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Price per one peace/Цена за шт/ 单件价格",
         "Price per 1 pcs / Цена за 1 шт, USD 单价",
         "Price per pcs /Цена за шт, CNY",
-        "Price for unit, Chinese yuan / Цена за единицу, китайские юани"
+        "Price for unit, Chinese yuan / Цена за единицу, китайские юани",
+        "Price USD / unit / Цена USD / ед.",
+        "單價 / Price per unit / Цена за ед изм, USD",
+        "Цена за шт, USD",
+        "Цена, USD",
+        "Price USD/unit of measure. / Цена, долл.США/ед.изм."
     ):
         "price_per_piece",
     (
@@ -133,7 +216,13 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Amount / Общая стоимость/ 总货值",
         "Amount / Общая стоимость, USD 总价",
         "Amount /Общая стоимость, CNY",
-        "The Ammount Of Chinese yuan / Сумма китайские юани"
+        "The Ammount Of Chinese yuan / Сумма китайские юани",
+        "Amount, USD / Стоимость, USD",
+        "总货值 / Amount / Общая стоимость, USD",
+        "Общая стоимость, USD",
+        "Сумма, USD",
+        "Стоимость, $",
+        "Amount, USD / Стоимость, долл.США"
     ):
         "total_cost"
 }
@@ -150,7 +239,7 @@ def get_file_handler(name: str) -> logging.FileHandler:
     log_dir_name: str = f"{get_my_env_var('XL_IDP_PATH_UNZIPPING')}/logging"
     if not os.path.exists(log_dir_name):
         os.mkdir(log_dir_name)
-    file_handler = RotatingFileHandler(filename=f"{log_dir_name}/{name}.log", mode='a', maxBytes=1.5 * pow(1024, 2),
+    file_handler = RotatingFileHandler(filename=f"{log_dir_name}/{name}.log", mode='a', maxBytes=10.5 * pow(1024, 2),
                                        backupCount=3)
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FTM))
     return file_handler

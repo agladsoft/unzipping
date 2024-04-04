@@ -1,5 +1,7 @@
+import contextlib
 import re
 import json
+import shutil
 import zipfile
 import rarfile
 import numpy as np
@@ -33,6 +35,8 @@ class DataExtractor:
             "price_per_piece": None,
             "total_cost": None
         }
+        self.logger: logging.getLogger = get_logger(os.path.basename("data_extractor").replace(".py", "_")
+                                                    + str(datetime.now().date()))
 
     @staticmethod
     def _is_digit(x: str) -> bool:
@@ -90,12 +94,33 @@ class DataExtractor:
         count: int = sum(element in list_columns for element in row)
         return int(count / len(row) * 100)
 
+    def copy_file_to_dir(self, dir_name):
+        """
+
+        :return:
+        """
+        os.makedirs(os.path.join(self.directory, dir_name), exist_ok=True)
+        os.popen(f"cp '{self.filename}' '{os.path.join(self.directory, dir_name)}'")
+
+    def write_to_file(self, list_data: list) -> None:
+        """
+        Write data to xlsx.
+        :return:
+        """
+        if not list_data:
+            self.logger.error(f"В файле не найдены данные для обработки. Файл - {self.filename}")
+            self.copy_file_to_dir("errors_excel")
+        else:
+            self.write_to_json(list_data)
+            self.copy_file_to_dir("done_excel")
+
     def write_to_json(self, list_data: list) -> None:
         """
         Write data to json.
         :param list_data:
         :return:
         """
+        self.logger.info(f"Данные записываются в файл json. Файл -{self.filename}")
         basename = os.path.basename(self.filename)
         dir_name = os.path.join(self.directory, 'json')
         os.makedirs(dir_name, exist_ok=True)
@@ -114,6 +139,17 @@ class DataExtractor:
                     if column == column_eng:
                         self.dict_columns_position[DICT_HEADERS_COLUMN_ENG[columns]] = index
 
+    def is_all_right_columns(self, context: dict) -> None:
+        if (
+                (context.get("seller") or context.get("seller_priority"))
+                and (context.get("buyer") or context.get("buyer_priority"))
+                and context.get("destination_station")
+        ):
+            return True
+        self.logger.error(f"В файле нету нужных полей. Файл - {self.filename}")
+        self.copy_file_to_dir("errors_excel")
+        return False
+
     def _get_content_before_table(self, rows: list, context: dict) -> Dict[str, str]:
         """
         Getting the date, ship name and voyage in the cells before the table.
@@ -123,6 +159,7 @@ class DataExtractor:
         """
         for i, row in enumerate(rows, 1):
             if row:
+                splitter_column = row.split(":")
                 column = row.translate({ord(c): "" for c in ":："}).strip()
                 for columns in DICT_LABELS:
                     if column in columns:
@@ -134,6 +171,8 @@ class DataExtractor:
                             cell = self._remove_symbols_in_columns(cell)
                             context[DICT_LABELS[columns]] = context[DICT_LABELS[columns]] \
                                 if context.get(DICT_LABELS[columns]) else cell
+                    elif splitter_column[0] in columns and DICT_LABELS.get(columns) == "destination_station":
+                        context[DICT_LABELS[columns]] = splitter_column[1].strip()
 
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
         """
@@ -154,7 +193,12 @@ class DataExtractor:
         Main function.
         :return:
         """
-        df = pd.read_excel(self.filename, dtype=str)
+        try:
+            df = pd.read_excel(self.filename, dtype=str)
+        except Exception as ex:
+            self.logger.error(f"Ошибка при чтении файла {self.filename}: {ex}")
+            self.copy_file_to_dir("errors_excel")
+            return
         df.dropna(how='all', inplace=True)
         df.replace({np.nan: None, "NaT": None}, inplace=True)
         context: dict = {}
@@ -163,27 +207,38 @@ class DataExtractor:
             rows = list(rows.to_dict().values())
             try:
                 if self._get_probability_of_header(rows, self._get_list_columns()) > COEFFICIENT_OF_HEADER_PROBABILITY:
+                    if not self.is_all_right_columns(context):
+                        return
                     self._get_columns_position(rows)
                 elif self._is_table_starting(rows):
                     self._get_content_in_table(rows, list_data, context)
             except TypeError:
                 self._get_content_before_table(rows, context)
-        self.write_to_json(list_data)
+        self.write_to_file(list_data)
 
 
 class ArchiveExtractor:
     def __init__(self, directory):
-        self.logger: logging.getLogger = get_logger(os.path.basename(__file__).replace(".py", "_")
+        self.logger: logging.getLogger = get_logger(os.path.basename("archive_extractor").replace(".py", "_")
                                                     + str(datetime.now().date()))
         self.root_directory = directory
-        self.dir_name = directory
-        self.current_dir = None
+        self.dir_name = os.path.join(directory, 'archives')
+        self.clear_directory()
         self.extension_handlers = {
             '.xlsx': self.read_excel_file,
             '.xls': self.read_excel_file,
             '.zip': self.unzip_archive,
             '.rar': self.unrar_archive
         }
+        
+    def clear_directory(self):
+        """
+
+        :return:
+        """
+        with contextlib.suppress(FileNotFoundError):
+            shutil.rmtree(self.dir_name)
+        os.makedirs(self.dir_name, exist_ok=True)
 
     def read_excel_file(self, file_path):
         """
@@ -193,7 +248,6 @@ class ArchiveExtractor:
         """
         self.logger.info(f"Найден файл Excel: {file_path}")
         DataExtractor(file_path, self.root_directory).main()
-        self.dir_name = self.dir_name.replace(self.current_dir, '')
 
     def save_archive(self, archive, file_info):
         """
@@ -205,15 +259,16 @@ class ArchiveExtractor:
         if file_info.is_dir():
             return
         extract_to = os.path.dirname(file_info.filename)
-        self.current_dir = extract_to
-        self.dir_name = os.path.join(self.dir_name, extract_to)
-        inner_archive_file = archive.open(file_info.filename)
-        inner_archive_filename = os.path.join(self.dir_name, os.path.basename(file_info.filename))
-        os.makedirs(self.dir_name, exist_ok=True)
-        with open(inner_archive_filename, 'wb') as f:
-            f.write(inner_archive_file.read())
-        inner_archive_file.close()
-        return inner_archive_filename
+        inner_archive_filename = os.path.join(self.dir_name, extract_to, os.path.basename(file_info.filename))
+        os.makedirs(os.path.dirname(inner_archive_filename), exist_ok=True)
+        try:
+            inner_archive_file = archive.open(file_info.filename)
+            with open(inner_archive_filename, 'wb') as f:
+                f.write(inner_archive_file.read())
+            inner_archive_file.close()
+            return inner_archive_filename
+        except Exception as ex:
+            self.logger.error(f"Ошибка при сохранении файла {file_info.filename}: {ex}. Path is {self.dir_name}")
 
     def unrar_archive(self, rar_file):
         """
@@ -250,14 +305,13 @@ class ArchiveExtractor:
             handler(file_path)
         else:
             self.logger.info(f"Найден файл: {file_path}")
-            self.dir_name = self.dir_name.replace(self.current_dir, '')
 
     def main(self):
         """
         Main function.
         :return:
         """
-        for root, dirs, files in os.walk(self.dir_name):
+        for root, dirs, files in os.walk(self.root_directory):
             for file in files:
                 file_path = os.path.join(root, file)
                 self.process_archive(file_path)
