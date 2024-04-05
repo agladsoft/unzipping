@@ -81,6 +81,10 @@ DICT_LABELS: dict = {
         "destination_station"
 }
 
+DESTINATION_STATION_LABELS: Tuple = (
+    "Address/ Адрес/ 地址",
+)
+
 DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
     (
         "Модель",

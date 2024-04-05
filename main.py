@@ -1,9 +1,9 @@
-import contextlib
 import re
 import json
 import shutil
 import zipfile
 import rarfile
+import contextlib
 import numpy as np
 import pandas as pd
 from __init__ import *
@@ -150,6 +150,26 @@ class DataExtractor:
         self.copy_file_to_dir("errors_excel")
         return False
 
+    def _get_address_same_keys(self, context, i, count_address, row, rows):
+        """
+        Getting an address with the same keys.
+        :param context:
+        :param i:
+        :param count_address:
+        :param row:
+        :param rows:
+        :return:
+        """
+        if row in DESTINATION_STATION_LABELS and not context.get(row):
+            count_address += 1
+            if count_address == 2:
+                for cell in rows[i:]:
+                    if not cell:
+                        continue
+                    cell = self._remove_symbols_in_columns(cell)
+                    context["destination_station"] = context[row] if context.get(row) else cell
+        return count_address
+
     def _get_content_before_table(self, rows: list, context: dict) -> Dict[str, str]:
         """
         Getting the date, ship name and voyage in the cells before the table.
@@ -157,8 +177,10 @@ class DataExtractor:
         :param context:
         :return:
         """
+        count_address = 0
         for i, row in enumerate(rows, 1):
             if row:
+                count_address = self._get_address_same_keys(context, i, count_address, row, rows)
                 splitter_column = row.split(":")
                 column = row.translate({ord(c): "" for c in ":："}).strip()
                 for columns in DICT_LABELS:
@@ -201,7 +223,9 @@ class DataExtractor:
             return
         df.dropna(how='all', inplace=True)
         df.replace({np.nan: None, "NaT": None}, inplace=True)
-        context: dict = {}
+        context: dict = {
+            "original_file_name": os.path.basename(self.filename)
+        }
         list_data: List[dict] = []
         for _, rows in df.iterrows():
             rows = list(rows.to_dict().values())
