@@ -67,8 +67,15 @@ class DataExtractor:
                 self._is_digit(row[self.dict_columns_position["number_pp"]])
         ) and row[self.dict_columns_position["tnved_code"]]
 
+    def _remove_spaces_and_symbols(self, row: str) -> str:
+        """
+        Remove spaces.
+        """
+        row = row.translate({ord(c): "" for c in ":："}).strip()
+        return self._remove_many_spaces(row)
+
     @staticmethod
-    def _remove_symbols_in_columns(row: str) -> str:
+    def _remove_many_spaces(row: str) -> str:
         """
         Bringing the header column to a unified form.
         """
@@ -90,7 +97,7 @@ class DataExtractor:
         """
         Getting the probability of a row as a header.
         """
-        row: list = list(map(self._remove_symbols_in_columns, row))
+        row: list = list(map(self._remove_many_spaces, row))
         count: int = sum(element in list_columns for element in row)
         return int(count / len(row) * 100)
 
@@ -132,7 +139,7 @@ class DataExtractor:
         """
         Get the position of each column in the file to process the row related to that column.
         """
-        rows: list = list(map(self._remove_symbols_in_columns, rows))
+        rows: list = list(map(self._remove_many_spaces, rows))
         for index, column in enumerate(rows):
             for columns in DICT_HEADERS_COLUMN_ENG:
                 for column_eng in columns:
@@ -166,7 +173,7 @@ class DataExtractor:
                 for cell in rows[i:]:
                     if not cell:
                         continue
-                    cell = self._remove_symbols_in_columns(cell)
+                    cell = self._remove_many_spaces(cell)
                     context["destination_station"] = context[row] if context.get(row) else cell
         return count_address
 
@@ -182,7 +189,7 @@ class DataExtractor:
             if row:
                 count_address = self._get_address_same_keys(context, i, count_address, row, rows)
                 splitter_column = row.split(":")
-                column = row.translate({ord(c): "" for c in ":："}).strip()
+                column = self._remove_spaces_and_symbols(row)
                 for columns in DICT_LABELS:
                     if column in columns:
                         for cell in rows[i:]:
@@ -190,7 +197,7 @@ class DataExtractor:
                                 break
                             if not cell:
                                 continue
-                            cell = self._remove_symbols_in_columns(cell)
+                            cell = self._remove_many_spaces(cell)
                             context[DICT_LABELS[columns]] = context[DICT_LABELS[columns]] \
                                 if context.get(DICT_LABELS[columns]) else cell
                     elif splitter_column[0] in columns and DICT_LABELS.get(columns) == "destination_station":
@@ -342,5 +349,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    ArchiveExtractor('/home/timur/sambashare/unzipping').main()
-    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
+    # ArchiveExtractor('/home/timur/sambashare/unzipping').main()
+    import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
