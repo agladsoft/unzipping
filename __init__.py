@@ -10,6 +10,14 @@ os.environ['XL_IDP_PATH_UNZIPPING'] = '.'
 
 COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
 
+PRIORITY_SHEETS: list = [
+    "INVOICE- SPECIFICATION",
+    "инвойс спецификация",
+    "проф",
+    "Проформа",
+    "спецификаци"
+]
+
 DICT_LABELS: dict = {
     (
         "Продавец",
@@ -28,7 +36,8 @@ DICT_LABELS: dict = {
         "Shipper/Отправитель",
         "Отправитель по станции/ Shipper in SMGS/ 运单发货人",
         "The Sender/ Отправитель",
-        "Shipper / Отправитель"
+        "Shipper / Отправитель",
+        "Отправитель / Shipper"
     ):
         "seller",
     (
@@ -69,7 +78,8 @@ DICT_LABELS: dict = {
         "Покупатель/The buyer 买方",
         "Покупатель/Buyer 买家",
         "The Buyer / Покупатель The Consigneee/ Получатель",
-        "The Buyer/ Покупатель"
+        "The Buyer/ Покупатель",
+        "Buyer/Покупатель"
     ):
         "buyer_priority",
     (

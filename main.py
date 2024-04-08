@@ -217,22 +217,36 @@ class DataExtractor:
         parsed_record = self._merge_two_dicts(context, parsed_record)
         list_data.append(parsed_record)
 
+    def read_excel_file(self):
+        """
+        Read the Excel file.
+        :return:
+        """
+        sheets = pd.ExcelFile(self.filename).sheet_names
+        if len(sheets) > 1:
+            self.logger.info(f"В файле несколько листов {sheets}. Файл - {self.filename}")
+            for sheet in sheets:
+                if sheet in PRIORITY_SHEETS:
+                    df = pd.read_excel(self.filename, sheet_name=sheet, dtype=str)
+                    break
+            else:
+                df = pd.read_excel(self.filename, sheet_name=sheets[0], dtype=str)
+        else:
+            df = pd.read_excel(self.filename, dtype=str)
+        return df.dropna(how='all').replace({np.nan: None, "NaT": None})
+
     def main(self):
         """
         Main function.
         :return:
         """
         try:
-            df = pd.read_excel(self.filename, dtype=str)
+            df = self.read_excel_file()
         except Exception as ex:
             self.logger.error(f"Ошибка при чтении файла {self.filename}: {ex}")
             self.copy_file_to_dir("errors_excel")
             return
-        df.dropna(how='all', inplace=True)
-        df.replace({np.nan: None, "NaT": None}, inplace=True)
-        context: dict = {
-            "original_file_name": os.path.basename(self.filename)
-        }
+        context: dict = {"original_file_name": os.path.basename(self.filename)}
         list_data: List[dict] = []
         for _, rows in df.iterrows():
             rows = list(rows.to_dict().values())
