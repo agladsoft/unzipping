@@ -19,7 +19,9 @@ PRIORITY_SHEETS: list = [
     "проф",
     "Проформа",
     "спецификаци",
-    "инв-спецификация"
+    "спецификация",
+    "инв-спецификация",
+    "инвойс"
 ]
 
 DICT_LABELS: dict = {
@@ -43,7 +45,8 @@ DICT_LABELS: dict = {
         "Отправитель / Shipper",
         "Отправитель / shipper",
         "Продавец/ Отправитель",
-        "The Consignor / Отправитель"
+        "The Consignor / Отправитель",
+        "Отправитель/ Shipper"
     ):
         "seller",
     (
@@ -65,7 +68,8 @@ DICT_LABELS: dict = {
         "The Seller/ Продавец",
         "Seller/Продавец/ 卖方",
         "Seller/shipper",
-        "Seller"
+        "Seller",
+        "Продавец/ Seller"
     ):
         "seller_priority",
     (
@@ -103,7 +107,8 @@ DICT_LABELS: dict = {
         "Destination Station/ Станция назначения 目的站",
         "Станция назначения/目的车站",
         "Beneficiary",
-        "Station of destination / Станция назначения"
+        "Station of destination / Станция назначения",
+        "Destination station/"
     ):
         "destination_station"
 }
@@ -241,7 +246,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Net weight, kg / Вес нетто, кг",
         "Net Weight (KG) Нетто",
         "Net weight kg / Вес нетто кг/ 净重",
-        "Net weight, kg / Вес  нетто, кг."
+        "Net weight, kg / Вес  нетто, кг.",
+        "Net weight, kg / Вес нетто, кг."
     ):
         "net_weight",
     (
@@ -258,7 +264,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Gross weight, kg / Вес брутто,кг",
         "Gross Weight (KG) Брутто",
         "Gross weight kg / Вес брутто кг / 毛重",
-        "Gross weight, kg / Вес  брутто,кг."
+        "Gross weight, kg / Вес  брутто,кг.",
+        "Gross weight, kg / Вес брутто,кг."
     ):
         "gross_weight",
     (
@@ -277,7 +284,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Price USD/ Цена долл. США",
         "Unit Price (USD)",
         "Unit Price / Цена за ед, USD",
-        "Price USD / unit / Цена долл. США /единицу измерения"
+        "Price USD / unit / Цена долл. США /единицу измерения",
+        "Price USD/ Цена долл.США"
     ):
         "price_per_piece",
     (
