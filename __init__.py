@@ -144,7 +144,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "HS Code",
         "HS Code / Код ТН ВЭД ТС HS CODE",
         "HS CODE",
-        "HS Code / Код ТН ВЭД ТС (10位数)"
+        "HS Code / Код ТН ВЭД ТС (10位数)",
+        "HS Code / Код ТН ВЭД ТС (10位数）"
     ):
         "tnved_code",
     (

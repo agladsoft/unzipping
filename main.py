@@ -7,8 +7,9 @@ import contextlib
 import numpy as np
 import pandas as pd
 from __init__ import *
+from pprint import pprint
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
 
 
 class JsonEncoder(json.JSONEncoder):
@@ -146,13 +147,14 @@ class DataExtractor:
                     if column == column_eng:
                         self.dict_columns_position[DICT_HEADERS_COLUMN_ENG[columns]] = index
 
-    def is_all_right_columns(self, context: dict) -> None:
+    def is_all_right_columns(self, context: dict) -> bool:
         if (
                 (context.get("seller") or context.get("seller_priority"))
                 and (context.get("buyer") or context.get("buyer_priority"))
                 and context.get("destination_station")
         ):
             return True
+        pprint(context)
         self.logger.error(f"В файле нету нужных полей. Файл - {self.filename}")
         self.copy_file_to_dir("errors_excel")
         return False
@@ -177,7 +179,7 @@ class DataExtractor:
                     context["destination_station"] = context[row] if context.get(row) else cell
         return count_address
 
-    def _get_content_before_table(self, rows: list, context: dict) -> Dict[str, str]:
+    def _get_content_before_table(self, rows: list, context: dict) -> None:
         """
         Getting the date, ship name and voyage in the cells before the table.
         :param rows:
@@ -346,6 +348,7 @@ class ArchiveExtractor:
         :return:
         """
         _, ext = os.path.splitext(file_path)
+        handler: Callable[[dict], None]
         if handler := self.extension_handlers.get(ext):
             handler(file_path)
         else:
@@ -363,5 +366,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    # ArchiveExtractor('/home/timur/sambashare/unzipping').main()
-    import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
+    ArchiveExtractor('/home/timur/sambashare/unzipping').main()
+    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
