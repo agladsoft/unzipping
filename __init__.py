@@ -12,6 +12,9 @@ COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
 
 PRIORITY_SHEETS: list = [
     "INVOICE- SPECIFICATION",
+    "INVOICE CPT SVILENGRAD",
+    "ИНВ-проформа Китай",
+    "Спецификация PR",
     "инвойс спецификация",
     "проф",
     "Проформа",
@@ -21,7 +24,6 @@ PRIORITY_SHEETS: list = [
 
 DICT_LABELS: dict = {
     (
-        "Продавец",
         "Отправитель",
         "Отправитель / Продавец",
         "Продавец/Отправитель",
@@ -40,10 +42,12 @@ DICT_LABELS: dict = {
         "Shipper / Отправитель",
         "Отправитель / Shipper",
         "Отправитель / shipper",
-        "Продавец/ Отправитель"
+        "Продавец/ Отправитель",
+        "The Consignor / Отправитель"
     ):
         "seller",
     (
+        "Продавец"
         "Shipper/Seller",
         "Seller/Продавец/ 卖家",
         "Продавец/Seller",
@@ -66,6 +70,7 @@ DICT_LABELS: dict = {
         "seller_priority",
     (
         "Покупатель",
+        "Покупатель/"
     ):
         "buyer",
     (
@@ -105,6 +110,7 @@ DICT_LABELS: dict = {
 
 DESTINATION_STATION_LABELS: Tuple = (
     "Address/ Адрес/ 地址",
+    "Address/ Адрес/ "
 )
 
 DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
@@ -120,7 +126,6 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "No. / №",
         "Номер",
         "№",
-        "No. / №",
         "Item Позиция"
     ):
         "number_pp",
@@ -145,7 +150,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "HS Code / Код ТН ВЭД ТС HS CODE",
         "HS CODE",
         "HS Code / Код ТН ВЭД ТС (10位数)",
-        "HS Code / Код ТН ВЭД ТС (10位数）"
+        "HS Code / Код ТН ВЭД ТС (10位数）",
+        "КОД ТН ВЭД",
+        "Tariff code / Код товара в  соответствии с ТН ВЭД"
     ):
         "tnved_code",
     (
@@ -171,6 +178,7 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Name of product / Наименование товара",
         "Описание товаров/description of goods货物名称",
         "Название",
+        "Наименование",
         "Наименование товара",
         "Name of product / Наименование товара",
         "Description Описание товара",
@@ -195,7 +203,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Number of pairs / Кол-во пар",
         "Qty pcs / Кол-во шт 单件数",
         "Q-ty, pcs / Кол-во в ед. измерения",
-        "Q'TY"
+        "Q'TY",
+        "Q-ty, pcs. / Кол-во в ед. измерения"
     ):
         "quantity",
     (
@@ -214,7 +223,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Qty of packages/Кол-во мест, коробок",
         "Number of pkgs Место",
         "Qty of packages/ Кол-во мест/ 包装数量",
-        "Qty of packages/Кол-во мест, коробов 件数"
+        "Qty of packages/Кол-во мест, коробов 件数",
+        "Total q-ty, pcs / Общее кол-во в ед. измерения, шт"
     ):
         "package_quantity",
     (
@@ -265,7 +275,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Unit Price (PC) единичная цена",
         "Price per pair/Цена за пару/CNY",
         "Price USD/ Цена долл. США",
-        "Unit Price (USD)"
+        "Unit Price (USD)",
+        "Unit Price / Цена за ед, USD",
+        "Price USD / unit / Цена долл. США /единицу измерения"
     ):
         "price_per_piece",
     (
@@ -283,7 +295,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Total Price Общая цена",
         "Amount / Общая стоимость/CNY",
         "Amount (USD)",
-        "Amount / Общая стоимость,CNY"
+        "Amount / Общая стоимость,CNY",
+        "Amount / Стоимость, USD"
     ):
         "total_cost"
 }
