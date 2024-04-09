@@ -44,6 +44,8 @@ class DataExtractor:
         """
         Checks if a value is a number.
         """
+        if x is None:
+            return False
         try:
             float(re.sub(r'(?<=\d) (?=\d)', '', x))
             return True
@@ -65,7 +67,8 @@ class DataExtractor:
         """
         return (
                 self.dict_columns_position["model"] or
-                self._is_digit(row[self.dict_columns_position["number_pp"]])
+                self.dict_columns_position["country_of_origin"] or
+                self._is_digit(row[self.dict_columns_position.get("number_pp")])
         ) and row[self.dict_columns_position["tnved_code"]]
 
     def _remove_spaces_and_symbols(self, row: str) -> str:
@@ -98,7 +101,7 @@ class DataExtractor:
         """
         Getting the probability of a row as a header.
         """
-        row: list = list(map(self._remove_many_spaces, row))
+        row: list = list(filter(lambda x: x is not None, map(self._remove_many_spaces, row)))
         count: int = sum(element in list_columns for element in row)
         return int(count / len(row) * 100)
 
@@ -155,6 +158,7 @@ class DataExtractor:
         ):
             return True
         pprint(context)
+        print(self.filename)
         self.logger.error(f"В файле нету нужных полей. Файл - {self.filename}")
         self.copy_file_to_dir("errors_excel")
         return False

@@ -13,12 +13,14 @@ COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
 PRIORITY_SHEETS: list = [
     "INVOICE- SPECIFICATION",
     "INVOICE CPT SVILENGRAD",
+    "Proforma Invoice",
     "ИНВ-проформа Китай",
     "Спецификация PR",
     "инвойс спецификация",
     "проф",
     "Проформа",
     "спецификаци",
+    "спецификаци-1",
     "спецификация",
     "инв-спецификация",
     "инвойс"
@@ -46,7 +48,12 @@ DICT_LABELS: dict = {
         "Отправитель / shipper",
         "Продавец/ Отправитель",
         "The Consignor / Отправитель",
-        "Отправитель/ Shipper"
+        "Отправитель/ Shipper",
+        "Грузотправитель/Shipper",
+        "Отправитель/The Sender",
+        "Shipper/Отправитель (same as smgs'shipper)",
+        "SHIPPER （发货人）",
+        "Отправитель / Продавец Shipper/Seller"
     ):
         "seller",
     (
@@ -61,15 +68,20 @@ DICT_LABELS: dict = {
         "The Seller / Продавец",
         "Seller/Продавец",
         "Продавец/The seller 卖方",
+        "Продавец/The seller",
         "Consignor / Грузоотправитель/Продавец",
         "Продавец / Отправитель Seller/ Shipper",
+        "Продавец/Seller Отправитель/Sender",
         "Seller/ Продавец",
         "Продавец/Seller 卖家",
         "The Seller/ Продавец",
         "Seller/Продавец/ 卖方",
         "Seller/shipper",
         "Seller",
-        "Продавец/ Seller"
+        "SELLER",
+        "Продавец /",
+        "Продавец/ Seller",
+        "Продавец /Отправитель"
     ):
         "seller_priority",
     (
@@ -87,6 +99,7 @@ DICT_LABELS: dict = {
         "Buyer /",
         "The Buyer / Покупатель",
         "The Buyer",
+        "Покупатель/The buyer",
         "Покупатель/The buyer 买方",
         "Consignee / Грузополучатель/Покупатель",
         "Получатель/",
@@ -96,7 +109,12 @@ DICT_LABELS: dict = {
         "The Buyer/ Покупатель",
         "Buyer/Покупатель",
         "Buyer / Покупатель/ 买方",
-        "Buyer/Consignee"
+        "Buyer/Consignee",
+        "Покупатель/Buyer",
+        "Покупатель/Buyer Получатель/Recipient",
+        "Покупатель/ Получатель",
+        "Получатель/Покупатель",
+        "BUYER"
     ):
         "buyer_priority",
     (
@@ -108,7 +126,10 @@ DICT_LABELS: dict = {
         "Станция назначения/目的车站",
         "Beneficiary",
         "Station of destination / Станция назначения",
-        "Destination station/"
+        "Destination station/",
+        "Destination Station / Станция назначения",
+        "Destination Station/Станция назначения",
+        "Station of destination Станция назначения"
     ):
         "destination_station"
 }
@@ -157,7 +178,10 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "HS Code / Код ТН ВЭД ТС (10位数)",
         "HS Code / Код ТН ВЭД ТС (10位数）",
         "КОД ТН ВЭД",
-        "Tariff code / Код товара в  соответствии с ТН ВЭД"
+        "Tariff code / Код товара в  соответствии с ТН ВЭД",
+        "HS Code / Код ТН ВЭД ЕАЭС",
+        "CODE КОД ТНВЭД",
+        "（清关HS编码）HS Code / Код ТН ВЭД ТС"
     ):
         "tnved_code",
     (
@@ -169,7 +193,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Страна происхождения товара商品原产地",
         "Страна происх.товара",
         "Страна происхождения",
-        "Страна происхождения товара 货源国(英文/俄文)"
+        "Страна происхождения товара 货源国(英文/俄文)",
+        "COUNTRY OF ORIGINE СТРАНА ПРОИСХОЖДЕНИЯ"
     ):
         "country_of_origin",
     (
@@ -190,7 +215,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Description of goods/ Описание товаров/RUS",
         "Описание товаров/description of goods 货物名，描述(英文/俄文) 织物、薄膜、卷装货物、玻璃等货物必须标注M2",
         "Наименование товара/Состав/размеры",
-        "DESCRIPTION"
+        "DESCRIPTION",
+        "DESCRIPTION НАИМЕНОВАНИЕ ТОВАРА",
+        "Описание товаров/description of goods （中英俄品名）"
     ):
         "goods_description",
     (
@@ -209,7 +236,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Qty pcs / Кол-во шт 单件数",
         "Q-ty, pcs / Кол-во в ед. измерения",
         "Q'TY",
-        "Q-ty, pcs. / Кол-во в ед. измерения"
+        "Q-ty, pcs. / Кол-во в ед. измерения",
+        "QUANTITY (m) КОЛ-ВО (м)",
+        "（小件数)Qty pcs / Кол-во шт"
     ):
         "quantity",
     (
@@ -229,7 +258,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Number of pkgs Место",
         "Qty of packages/ Кол-во мест/ 包装数量",
         "Qty of packages/Кол-во мест, коробов 件数",
-        "Total q-ty, pcs / Общее кол-во в ед. измерения, шт"
+        "Total q-ty, pcs / Общее кол-во в ед. измерения, шт",
+        "QUANTITY PLACES КОЛ-ВО МЕСТ",
+        "(大件数）Qty of packages/Кол-во мест, коробов"
     ):
         "package_quantity",
     (
@@ -247,7 +278,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Net Weight (KG) Нетто",
         "Net weight kg / Вес нетто кг/ 净重",
         "Net weight, kg / Вес  нетто, кг.",
-        "Net weight, kg / Вес нетто, кг."
+        "Net weight, kg / Вес нетто, кг.",
+        "NETTO WEIGHT,kg ВЕС НЕТТО,кг",
+        "（净重）Net weight kg / Вес нетто кг"
     ):
         "net_weight",
     (
@@ -265,7 +298,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Gross Weight (KG) Брутто",
         "Gross weight kg / Вес брутто кг / 毛重",
         "Gross weight, kg / Вес  брутто,кг.",
-        "Gross weight, kg / Вес брутто,кг."
+        "Gross weight, kg / Вес брутто,кг.",
+        "GROSS WEIGHT,kg ВЕС БРУТТО, кг",
+        "（毛重)Gross weight kg / Вес брутто кг"
     ):
         "gross_weight",
     (
@@ -285,7 +320,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Unit Price (USD)",
         "Unit Price / Цена за ед, USD",
         "Price USD / unit / Цена долл. США /единицу измерения",
-        "Price USD/ Цена долл.США"
+        "Price USD/ Цена долл.США",
+        "PRICE 100m ПРАЙС 100м",
+        "（单价）Price per pcs / Цена за шт, CNY"
     ):
         "price_per_piece",
     (
@@ -304,7 +341,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Amount / Общая стоимость/CNY",
         "Amount (USD)",
         "Amount / Общая стоимость,CNY",
-        "Amount / Стоимость, USD"
+        "Amount / Стоимость, USD",
+        "AMOUNT USD ОБШАЯ СТОИМОСТЬ USD",
+        "（总价）Amount / Общая стоимость, CNY"
     ):
         "total_cost"
 }
