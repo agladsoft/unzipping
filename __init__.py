@@ -50,7 +50,7 @@ DICT_LABELS: dict = {
     ):
         "seller",
     (
-        "Продавец"
+        "Продавец",
         "Shipper/Seller",
         "Seller/Продавец/ 卖家",
         "Продавец/Seller",
