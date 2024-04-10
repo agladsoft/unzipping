@@ -367,6 +367,7 @@ class ArchiveExtractor:
             for file in files:
                 file_path = os.path.join(root, file)
                 self.process_archive(file_path)
+            break
 
 
 if __name__ == '__main__':
