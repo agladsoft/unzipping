@@ -1,4 +1,5 @@
 import re
+import sys
 import json
 import shutil
 import zipfile
@@ -365,11 +366,14 @@ class ArchiveExtractor:
         """
         for root, dirs, files in os.walk(self.root_directory):
             for file in files:
-                file_path = os.path.join(root, file)
+                file_path: str = os.path.join(root, file)
                 self.process_archive(file_path)
+                done: str = os.path.join(root, "done")
+                os.makedirs(done, exist_ok=True)
+                os.rename(file_path, os.path.join(done, file))
             break
 
 
 if __name__ == '__main__':
-    ArchiveExtractor('/home/timur/sambashare/unzipping').main()
-    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
+    ArchiveExtractor(sys.argv[1]).main()
+    # DataExtractor(sys.argv[1], sys.argv[2]).main()
