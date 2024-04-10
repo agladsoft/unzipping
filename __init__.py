@@ -129,7 +129,8 @@ DICT_LABELS: dict = {
         "Destination station/",
         "Destination Station / Станция назначения",
         "Destination Station/Станция назначения",
-        "Station of destination Станция назначения"
+        "Station of destination Станция назначения",
+        "Destination station / Станция назначения"
     ):
         "destination_station"
 }
@@ -181,7 +182,9 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Tariff code / Код товара в  соответствии с ТН ВЭД",
         "HS Code / Код ТН ВЭД ЕАЭС",
         "CODE КОД ТНВЭД",
-        "（清关HS编码）HS Code / Код ТН ВЭД ТС"
+        "（清关HS编码）HS Code / Код ТН ВЭД ТС",
+        "HS Code / Код ТН ВЭД",
+        "HS Code / Код ТН ВЭД ТС（国外对应的HS CODE）"
     ):
         "tnved_code",
     (
@@ -194,7 +197,8 @@ DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
         "Страна происх.товара",
         "Страна происхождения",
         "Страна происхождения товара 货源国(英文/俄文)",
-        "COUNTRY OF ORIGINE СТРАНА ПРОИСХОЖДЕНИЯ"
+        "COUNTRY OF ORIGINE СТРАНА ПРОИСХОЖДЕНИЯ",
+        "Country of origin / Страна происхождения"
     ):
         "country_of_origin",
     (

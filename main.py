@@ -69,7 +69,7 @@ class DataExtractor:
                 self.dict_columns_position["model"] or
                 self.dict_columns_position["country_of_origin"] or
                 self._is_digit(row[self.dict_columns_position.get("number_pp")])
-        ) and row[self.dict_columns_position["tnved_code"]]
+        ) and row[self.dict_columns_position["tnved_code"]] and row[self.dict_columns_position["tnved_code"]].isdigit()
 
     def _remove_spaces_and_symbols(self, row: str) -> str:
         """
