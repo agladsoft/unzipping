@@ -375,5 +375,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    ArchiveExtractor(sys.argv[1]).main()
+    ArchiveExtractor(os.environ["XL_IDP_ROOT_NEW_ROUTE"]).main()
     # DataExtractor(sys.argv[1], sys.argv[2]).main()
