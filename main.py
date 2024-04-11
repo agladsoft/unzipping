@@ -69,7 +69,8 @@ class DataExtractor:
                 self.dict_columns_position["model"] or
                 self.dict_columns_position["country_of_origin"] or
                 self._is_digit(row[self.dict_columns_position.get("number_pp")])
-        ) and row[self.dict_columns_position["tnved_code"]] and row[self.dict_columns_position["tnved_code"]].isdigit()
+        ) and row[self.dict_columns_position["tnved_code"]] \
+            and any(char.isdigit() for char in row[self.dict_columns_position["tnved_code"]])
 
     def _remove_spaces_and_symbols(self, row: str) -> str:
         """
@@ -79,13 +80,14 @@ class DataExtractor:
         return self._remove_many_spaces(row)
 
     @staticmethod
-    def _remove_many_spaces(row: str) -> str:
+    def _remove_many_spaces(row: str, is_remove_spaces: bool = True) -> str:
         """
         Bringing the header column to a unified form.
         """
+        if is_remove_spaces:
+            return re.sub(r"\s+", "", row, flags=re.UNICODE).upper() if row else row
         row: str = re.sub(r"\n", " ", row).strip() if row else row
-        row: str = re.sub(r" +", " ", row).strip() if row else row
-        return row
+        return re.sub(r" +", " ", row).strip() if row else row
 
     @staticmethod
     def _get_list_columns() -> List[str]:
@@ -179,7 +181,7 @@ class DataExtractor:
                 for cell in rows[i:]:
                     if not cell:
                         continue
-                    cell = self._remove_many_spaces(cell)
+                    cell = self._remove_many_spaces(cell, is_remove_spaces=False)
                     context["destination_station"] = context[row] if context.get(row) else cell
         return count_address
 
@@ -199,15 +201,16 @@ class DataExtractor:
                 for columns in DICT_LABELS:
                     if column in columns:
                         for cell in rows[i:]:
-                            if any(cell in key for key in DICT_LABELS.keys()):
-                                break
                             if not cell:
                                 continue
-                            cell = self._remove_many_spaces(cell)
+                            if any(self._remove_spaces_and_symbols(cell) in key for key in DICT_LABELS.keys()):
+                                break
+                            cell = self._remove_many_spaces(cell, is_remove_spaces=False)
                             context[DICT_LABELS[columns]] = context[DICT_LABELS[columns]] \
                                 if context.get(DICT_LABELS[columns]) else cell
-                    elif splitter_column[0] in columns and DICT_LABELS.get(columns) == "destination_station":
-                        context[DICT_LABELS[columns]] = splitter_column[1].strip()
+                    elif self._remove_spaces_and_symbols(splitter_column[0]) in columns \
+                            and DICT_LABELS.get(columns) == "destination_station":
+                        context[DICT_LABELS[columns]] = splitter_column[-1].strip()
 
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
         """
@@ -375,4 +378,4 @@ class ArchiveExtractor:
 
 if __name__ == '__main__':
     ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
-    # DataExtractor(sys.argv[1], sys.argv[2]).main()
+    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
