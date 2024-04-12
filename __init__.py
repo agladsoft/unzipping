@@ -8,8 +8,8 @@ from logging.handlers import RotatingFileHandler
 LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
 DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
 
-os.environ["XL_IDP_ROOT_UNZIPPING"] = "."
-os.environ["XL_IDP_PATH_UNZIPPING"] = "/home/timur/sambashare/unzipping"
+# os.environ["XL_IDP_ROOT_UNZIPPING"] = "."
+# os.environ["XL_IDP_PATH_UNZIPPING"] = "/home/timur/sambashare/unzipping"
 
 COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
 
@@ -78,7 +78,7 @@ def read_config_table(sheet):
     df.replace({np.nan: None, "NaT": None}, inplace=True)
     headers = list(df.columns)
     return {
-        tuple(df.iloc[:, i].dropna().tolist()): header
+        header: list(df.iloc[:, i].dropna().tolist())
         for i, header in enumerate(headers)
     }
 
@@ -89,3 +89,4 @@ class MissingEnvironmentVariable(Exception):
 
 DICT_LABELS: dict = read_config_table("labels_before_table")
 DICT_HEADERS_COLUMN_ENG: dict = read_config_table("headers_table")
+DICT_STATION: dict = read_config_table("station")

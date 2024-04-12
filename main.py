@@ -93,7 +93,7 @@ class DataExtractor:
         Getting all column names for all lines in the __init__.py file.
         """
         list_columns = []
-        for keys in list(DICT_HEADERS_COLUMN_ENG.keys()):
+        for keys in list(DICT_HEADERS_COLUMN_ENG.values()):
             list_columns.extend(iter(keys))
         return list_columns
 
@@ -145,10 +145,10 @@ class DataExtractor:
         """
         rows: list = list(map(self._remove_many_spaces, rows))
         for index, column in enumerate(rows):
-            for columns in DICT_HEADERS_COLUMN_ENG:
+            for uni_columns, columns in DICT_HEADERS_COLUMN_ENG.items():
                 for column_eng in columns:
                     if column == column_eng:
-                        self.dict_columns_position[DICT_HEADERS_COLUMN_ENG[columns]] = index
+                        self.dict_columns_position[uni_columns] = index
 
     def is_all_right_columns(self, context: dict) -> bool:
         if (
@@ -191,42 +191,32 @@ class DataExtractor:
         :return:
         """
         for i, row in enumerate(rows, 1):
-            if row:
-                count_address = self._get_address_same_keys(context, i, count_address, row, rows)
-                splitter_column = row.split(":")
-                column = self._remove_spaces_and_symbols(row)
-                for columns in DICT_LABELS:
-                    if column in columns:
-                        for cell in rows[i:]:
-                            if not cell or self._is_digit(cell):
-                                continue
-                            if any(self._remove_spaces_and_symbols(cell) in key for key in DICT_LABELS.keys()):
-                                break
-                            cell = self._remove_many_spaces(cell, is_remove_spaces=False)
-                            context[DICT_LABELS[columns]] = context[DICT_LABELS[columns]] \
-                                if context.get(DICT_LABELS[columns]) else cell
-                    elif self._remove_spaces_and_symbols(splitter_column[0]) in columns \
-                            and DICT_LABELS.get(columns) == "destination_station":
-                        context[DICT_LABELS[columns]] = splitter_column[-1].strip()
+            if not row:
+                continue
+            count_address = self._get_address_same_keys(context, i, count_address, row, rows)
+            splitter_column = row.split(":")
+            column = self._remove_spaces_and_symbols(row)
+            for uni_columns, columns in DICT_LABELS.items():
+                if column in columns:
+                    for cell in rows[i:]:
+                        if not cell or self._is_digit(cell):
+                            continue
+                        if any(self._remove_spaces_and_symbols(cell) in key for key in DICT_LABELS.values()):
+                            break
+                        cell = self._remove_many_spaces(cell, is_remove_spaces=False)
+                        context.setdefault(uni_columns, cell)
+                elif self._remove_spaces_and_symbols(splitter_column[0]) in columns \
+                        and uni_columns == "destination_station":
+                    context[uni_columns] = splitter_column[-1].strip()
         return count_address
 
     @staticmethod
-    def unified_values(list_data):
-        df = pd.read_excel(
-            f"{get_my_env_var('XL_IDP_ROOT_UNZIPPING')}/unzipping_table.xlsx",
-            dtype=str,
-            sheet_name="station"
-        )
-        df.replace({np.nan: None, "NaT": None}, inplace=True)
-        # headers = list(df.columns)
-        # DICT_LABELS_ = {}
-        # for i, header in enumerate(headers):
-        #     DICT_LABELS_[tuple(df.iloc[:, i].dropna().tolist())] = header
+    def unified_values(list_data: List[dict]):
         for row in list_data:
-            for value in df['station'].values:
+            for value in DICT_STATION['station']:
                 if value and value in row['destination_station'].upper():
-                    index = df[df['station'] == value].index[0]
-                    row['destination_station'] = df.at[index, 'station_unified']
+                    index: int = DICT_STATION['station'].index(value)
+                    row['destination_station'] = DICT_STATION['station_unified'][index]
                     break
 
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
@@ -396,5 +386,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    # ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
-    import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
+    ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
+    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
