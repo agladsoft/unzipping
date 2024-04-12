@@ -393,5 +393,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    ArchiveExtractor("/home/timur/sambashare/unzipping").main()
+    ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
     # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
