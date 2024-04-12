@@ -212,6 +212,21 @@ class DataExtractor:
                             and DICT_LABELS.get(columns) == "destination_station":
                         context[DICT_LABELS[columns]] = splitter_column[-1].strip()
 
+    @staticmethod
+    def unified_values(list_data):
+        df = pd.read_excel(f"{get_my_env_var('XL_IDP_ROOT_UNZIPPING')}/unzipping_table.xlsx")
+        df.replace({np.nan: None, "NaT": None}, inplace=True)
+        # headers = list(df.columns)
+        # DICT_LABELS_ = {}
+        # for i, header in enumerate(headers):
+        #     DICT_LABELS_[tuple(df.iloc[:, i].dropna().tolist())] = header
+        for row in list_data:
+            for value in df['station'].values:
+                if value and value in row['destination_station'].upper():
+                    index = df[df['station'] == value].index[0]
+                    row['destination_station'] = df.at[index, 'station_unified']
+                    break
+
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
         """
         Getting the data from the table.
@@ -268,6 +283,7 @@ class DataExtractor:
                     self._get_content_in_table(rows, list_data, context)
             except TypeError:
                 self._get_content_before_table(rows, context)
+        self.unified_values(list_data)
         self.write_to_file(list_data)
 
 
@@ -377,5 +393,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
+    ArchiveExtractor("/home/timur/sambashare/unzipping").main()
     # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()

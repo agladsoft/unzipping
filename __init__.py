@@ -6,8 +6,6 @@ from logging.handlers import RotatingFileHandler
 LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
 DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
 
-os.environ["XL_IDP_ROOT_UNZIPPING"] = "."
-
 COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
 
 PRIORITY_SHEETS: list = [
