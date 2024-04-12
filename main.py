@@ -4,8 +4,6 @@ import shutil
 import zipfile
 import rarfile
 import contextlib
-import numpy as np
-import pandas as pd
 from __init__ import *
 from pprint import pprint
 from datetime import datetime
@@ -185,14 +183,13 @@ class DataExtractor:
                     context["destination_station"] = context[row] if context.get(row) else cell
         return count_address
 
-    def _get_content_before_table(self, rows: list, context: dict) -> None:
+    def _get_content_before_table(self, rows: list, context: dict, count_address: int) -> int:
         """
         Getting the date, ship name and voyage in the cells before the table.
         :param rows:
         :param context:
         :return:
         """
-        count_address = 0
         for i, row in enumerate(rows, 1):
             if row:
                 count_address = self._get_address_same_keys(context, i, count_address, row, rows)
@@ -201,7 +198,7 @@ class DataExtractor:
                 for columns in DICT_LABELS:
                     if column in columns:
                         for cell in rows[i:]:
-                            if not cell:
+                            if not cell or self._is_digit(cell):
                                 continue
                             if any(self._remove_spaces_and_symbols(cell) in key for key in DICT_LABELS.keys()):
                                 break
@@ -211,10 +208,15 @@ class DataExtractor:
                     elif self._remove_spaces_and_symbols(splitter_column[0]) in columns \
                             and DICT_LABELS.get(columns) == "destination_station":
                         context[DICT_LABELS[columns]] = splitter_column[-1].strip()
+        return count_address
 
     @staticmethod
     def unified_values(list_data):
-        df = pd.read_excel(f"{get_my_env_var('XL_IDP_ROOT_UNZIPPING')}/unzipping_table.xlsx")
+        df = pd.read_excel(
+            f"{get_my_env_var('XL_IDP_ROOT_UNZIPPING')}/unzipping_table.xlsx",
+            dtype=str,
+            sheet_name="station"
+        )
         df.replace({np.nan: None, "NaT": None}, inplace=True)
         # headers = list(df.columns)
         # DICT_LABELS_ = {}
@@ -272,6 +274,7 @@ class DataExtractor:
             return
         context: dict = {"original_file_name": os.path.basename(self.filename)}
         list_data: List[dict] = []
+        count_address = 0
         for _, rows in df.iterrows():
             rows = list(rows.to_dict().values())
             try:
@@ -282,7 +285,7 @@ class DataExtractor:
                 elif self._is_table_starting(rows):
                     self._get_content_in_table(rows, list_data, context)
             except TypeError:
-                self._get_content_before_table(rows, context)
+                count_address = self._get_content_before_table(rows, context, count_address)
         self.unified_values(list_data)
         self.write_to_file(list_data)
 
@@ -393,5 +396,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
-    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
+    # ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
+    import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
