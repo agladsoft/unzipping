@@ -199,7 +199,7 @@ class DataExtractor:
             for uni_columns, columns in DICT_LABELS.items():
                 if column in columns:
                     for cell in rows[i:]:
-                        if not cell or self._is_digit(cell):
+                        if cell is None or not cell.strip() or self._is_digit(cell):
                             continue
                         if any(self._remove_spaces_and_symbols(cell) in key for key in DICT_LABELS.values()):
                             break
