@@ -13,23 +13,6 @@ DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
 
 COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
 
-PRIORITY_SHEETS: list = [
-    "INVOICE- SPECIFICATION",
-    "INVOICE CPT SVILENGRAD",
-    "Proforma Invoice",
-    "ИНВ-проформа Китай",
-    "Спецификация PR",
-    "инвойс спецификация",
-    "проф",
-    "Проформа",
-    "спецификаци",
-    "спецификаци-1",
-    "спецификация",
-    "инв-спецификация",
-    "инвойс",
-    "жд спецификация"
-]
-
 DESTINATION_STATION_LABELS: Tuple = (
     "Address/ Адрес/ 地址",
     "Address/ Адрес/ "

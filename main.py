@@ -103,7 +103,10 @@ class DataExtractor:
         """
         row: list = list(filter(lambda x: x is not None, map(self._remove_many_spaces, row)))
         count: int = sum(element in list_columns for element in row)
-        return int(count / len(row) * 100)
+        probability_of_header: int = int(count / len(row) * 100)
+        if probability_of_header != 0 and probability_of_header < COEFFICIENT_OF_HEADER_PROBABILITY:
+            self.logger.error(f"Probability of header is {probability_of_header}. Columns is {row}")
+        return probability_of_header
 
     def copy_file_to_dir(self, dir_name):
         """
@@ -154,13 +157,12 @@ class DataExtractor:
         if (
                 (context.get("seller") or context.get("seller_priority"))
                 and (context.get("buyer") or context.get("buyer_priority"))
-                and context.get("destination_station")
+                and "destination_station" in context
         ):
             return True
         pprint(context)
         print(self.filename)
         self.logger.error(f"В файле нету нужных полей. Файл - {self.filename}")
-        self.copy_file_to_dir("errors_excel")
         return False
 
     def _get_address_same_keys(self, context, i, count_address, row, rows):
@@ -205,8 +207,9 @@ class DataExtractor:
                             break
                         cell = self._remove_many_spaces(cell, is_remove_spaces=False)
                         context.setdefault(uni_columns, cell)
-                elif self._remove_spaces_and_symbols(splitter_column[0]) in columns \
-                        and uni_columns == "destination_station":
+                    if not context.get(uni_columns):
+                        context.setdefault(uni_columns, None)
+                elif self._remove_spaces_and_symbols(splitter_column[0]) in columns:
                     context[uni_columns] = splitter_column[-1].strip()
         return count_address
 
@@ -214,7 +217,7 @@ class DataExtractor:
     def unified_values(list_data: List[dict]):
         for row in list_data:
             for value in DICT_STATION['station']:
-                if value and value in row['destination_station'].upper():
+                if value and row['destination_station'] and value in row['destination_station'].upper():
                     index: int = DICT_STATION['station'].index(value)
                     row['destination_station'] = DICT_STATION['station_unified'][index]
                     break
@@ -238,46 +241,44 @@ class DataExtractor:
         Read the Excel file.
         :return:
         """
-        sheets = pd.ExcelFile(self.filename).sheet_names
-        if len(sheets) > 1:
-            self.logger.info(f"В файле несколько листов {sheets}. Файл - {self.filename}")
-            for sheet in sheets:
-                if sheet in PRIORITY_SHEETS:
-                    df = pd.read_excel(self.filename, sheet_name=sheet, dtype=str)
-                    break
-            else:
-                df = pd.read_excel(self.filename, sheet_name=sheets[0], dtype=str)
-        else:
-            df = pd.read_excel(self.filename, dtype=str)
-        return df.dropna(how='all').replace({np.nan: None, "NaT": None})
-
-    def main(self):
-        """
-        Main function.
-        :return:
-        """
+        list_data: List[dict] = []
         try:
-            df = self.read_excel_file()
+            sheets = pd.ExcelFile(self.filename).sheet_names
+            for sheet in sheets:
+                self.logger.info(f"Sheet is {sheet}")
+                df = pd.read_excel(self.filename, sheet_name=sheet, dtype=str)
+                df = df.dropna(how='all').replace({np.nan: None, "NaT": None})
+                self.parse_rows(df, list_data)
+                if list_data:
+                    break
         except Exception as ex:
             self.logger.error(f"Ошибка при чтении файла {self.filename}: {ex}")
             self.copy_file_to_dir("errors_excel")
-            return
+        self.write_to_file(list_data)
+
+    def parse_rows(self, df: pd.DataFrame, list_data: List[dict]) -> Optional[List[dict]]:
+        """
+        Parse rows.
+        :param df:
+        :param list_data:
+        :return:
+        """
         context: dict = {"original_file_name": os.path.basename(self.filename)}
-        list_data: List[dict] = []
         count_address = 0
         for _, rows in df.iterrows():
             rows = list(rows.to_dict().values())
             try:
-                if self._get_probability_of_header(rows, self._get_list_columns()) > COEFFICIENT_OF_HEADER_PROBABILITY:
+                if self._get_probability_of_header(rows, self._get_list_columns()) >= COEFFICIENT_OF_HEADER_PROBABILITY:
                     if not self.is_all_right_columns(context):
                         return
                     self._get_columns_position(rows)
+                    self.logger.info(f"Columns position is {self.dict_columns_position}")
                 elif self._is_table_starting(rows):
                     self._get_content_in_table(rows, list_data, context)
             except TypeError:
                 count_address = self._get_content_before_table(rows, context, count_address)
         self.unified_values(list_data)
-        self.write_to_file(list_data)
+        return list_data
 
 
 class ArchiveExtractor:
@@ -310,7 +311,7 @@ class ArchiveExtractor:
         :return:
         """
         self.logger.info(f"Найден файл Excel: {file_path}")
-        DataExtractor(file_path, self.root_directory).main()
+        DataExtractor(file_path, self.root_directory).read_excel_file()
 
     def save_archive(self, archive, file_info):
         """
@@ -387,4 +388,4 @@ class ArchiveExtractor:
 
 if __name__ == '__main__':
     ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
-    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).main()
+    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).read_excel_file()
