@@ -157,7 +157,7 @@ class DataExtractor:
         if (
                 (context.get("seller") or context.get("seller_priority"))
                 and (context.get("buyer") or context.get("buyer_priority"))
-                and "destination_station" in context
+                and context.get("destination_station")
         ):
             return True
         pprint(context)
@@ -217,7 +217,7 @@ class DataExtractor:
     def unified_values(list_data: List[dict]):
         for row in list_data:
             for value in DICT_STATION['station']:
-                if value and row['destination_station'] and value in row['destination_station'].upper():
+                if value and value in row['destination_station'].upper():
                     index: int = DICT_STATION['station'].index(value)
                     row['destination_station'] = DICT_STATION['station_unified'][index]
                     break
