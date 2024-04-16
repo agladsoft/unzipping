@@ -75,7 +75,8 @@ class DataExtractor:
         """
         Remove spaces.
         """
-        row = row.translate({ord(c): "" for c in ":："}).strip()
+        row = re.sub(r'\W', '', row) if row else None
+        row = re.sub(r'[\u4e00-\u9fff]+', '', row) if row else None
         return self._remove_many_spaces(row)
 
     @staticmethod
@@ -85,6 +86,7 @@ class DataExtractor:
         """
         if is_remove_spaces:
             return re.sub(r"\s+", "", row, flags=re.UNICODE).upper() if row else row
+        row: str = re.sub(r'[\u4e00-\u9fff]+', '', row) if row else row
         row: str = re.sub(r"\n", " ", row).strip() if row else row
         return re.sub(r" +", " ", row).strip() if row else row
 
@@ -102,9 +104,9 @@ class DataExtractor:
         """
         Getting the probability of a row as a header.
         """
-        row: list = list(filter(lambda x: x is not None, map(self._remove_many_spaces, row)))
+        row: list = list(filter(lambda x: x is not None, map(self._remove_spaces_and_symbols, row)))
         count: int = sum(element in list_columns for element in row)
-        probability_of_header: int = int(count / len(row) * 100)
+        probability_of_header: int = int(count / len(row) * 100) if row else 0
         if probability_of_header != 0 and probability_of_header < COEFFICIENT_OF_HEADER_PROBABILITY:
             self.logger.error(f"Probability of header is {probability_of_header}. Columns is {row}")
         return probability_of_header
@@ -147,7 +149,7 @@ class DataExtractor:
         """
         Get the position of each column in the file to process the row related to that column.
         """
-        rows: list = list(map(self._remove_many_spaces, rows))
+        rows: list = list(map(self._remove_spaces_and_symbols, rows))
         for index, column in enumerate(rows):
             for uni_columns, columns in DICT_HEADERS_COLUMN_ENG.items():
                 for column_eng in columns:
@@ -412,5 +414,5 @@ class ArchiveExtractor:
 
 
 if __name__ == '__main__':
-    ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
-    # import sys; DataExtractor(sys.argv[1], sys.argv[2], "Ноябрь.zip").read_excel_file()
+    # ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
+    import sys; DataExtractor(sys.argv[1], sys.argv[2], "Ноябрь.zip").read_excel_file()
