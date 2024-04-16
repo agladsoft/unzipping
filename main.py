@@ -18,9 +18,10 @@ class JsonEncoder(json.JSONEncoder):
 
 
 class DataExtractor:
-    def __init__(self, filename, directory):
+    def __init__(self, filename, directory, input_data):
         self.filename = filename
         self.directory = directory
+        self.input_data = input_data
         self.dict_columns_position: Dict[str, Optional[int]] = {
             "model": None,
             "number_pp": None,
@@ -152,6 +153,7 @@ class DataExtractor:
                 for column_eng in columns:
                     if column == column_eng:
                         self.dict_columns_position[uni_columns] = index
+        self.logger.info(f"Columns position is {self.dict_columns_position}")
 
     def is_all_right_columns(self, context: dict) -> bool:
         if (
@@ -207,8 +209,6 @@ class DataExtractor:
                             break
                         cell = self._remove_many_spaces(cell, is_remove_spaces=False)
                         context.setdefault(uni_columns, cell)
-                    if not context.get(uni_columns):
-                        context.setdefault(uni_columns, None)
                 elif self._remove_spaces_and_symbols(splitter_column[0]) in columns:
                     context[uni_columns] = splitter_column[-1].strip()
         return count_address
@@ -236,6 +236,39 @@ class DataExtractor:
         parsed_record = self._merge_two_dicts(context, parsed_record)
         list_data.append(parsed_record)
 
+    def add_basic_columns(self):
+        context: dict = {
+            "original_file_name": os.path.basename(self.filename),
+            "original_file_parsed_on": str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "input_data": self.input_data
+        }
+        if container_number := re.findall(r"[A-Z]{4}\d{7}", os.path.basename(self.filename)):
+            context["container_number"] = container_number[0]
+        return context
+
+    def parse_rows(self, df: pd.DataFrame, list_data: List[dict]) -> Optional[List[dict]]:
+        """
+        Parse rows.
+        :param df:
+        :param list_data:
+        :return:
+        """
+        context: dict = self.add_basic_columns()
+        count_address = 0
+        for _, rows in df.iterrows():
+            rows = list(rows.to_dict().values())
+            try:
+                if self._get_probability_of_header(rows, self._get_list_columns()) >= COEFFICIENT_OF_HEADER_PROBABILITY:
+                    if not self.is_all_right_columns(context):
+                        return
+                    self._get_columns_position(rows)
+                elif self._is_table_starting(rows):
+                    self._get_content_in_table(rows, list_data, context)
+            except TypeError:
+                count_address = self._get_content_before_table(rows, context, count_address)
+        self.unified_values(list_data)
+        return list_data
+
     def read_excel_file(self):
         """
         Read the Excel file.
@@ -244,8 +277,8 @@ class DataExtractor:
         list_data: List[dict] = []
         try:
             sheets = pd.ExcelFile(self.filename).sheet_names
+            self.logger.info(f"Sheets is {sheets}")
             for sheet in sheets:
-                self.logger.info(f"Sheet is {sheet}")
                 df = pd.read_excel(self.filename, sheet_name=sheet, dtype=str)
                 df = df.dropna(how='all').replace({np.nan: None, "NaT": None})
                 self.parse_rows(df, list_data)
@@ -256,35 +289,12 @@ class DataExtractor:
             self.copy_file_to_dir("errors_excel")
         self.write_to_file(list_data)
 
-    def parse_rows(self, df: pd.DataFrame, list_data: List[dict]) -> Optional[List[dict]]:
-        """
-        Parse rows.
-        :param df:
-        :param list_data:
-        :return:
-        """
-        context: dict = {"original_file_name": os.path.basename(self.filename)}
-        count_address = 0
-        for _, rows in df.iterrows():
-            rows = list(rows.to_dict().values())
-            try:
-                if self._get_probability_of_header(rows, self._get_list_columns()) >= COEFFICIENT_OF_HEADER_PROBABILITY:
-                    if not self.is_all_right_columns(context):
-                        return
-                    self._get_columns_position(rows)
-                    self.logger.info(f"Columns position is {self.dict_columns_position}")
-                elif self._is_table_starting(rows):
-                    self._get_content_in_table(rows, list_data, context)
-            except TypeError:
-                count_address = self._get_content_before_table(rows, context, count_address)
-        self.unified_values(list_data)
-        return list_data
-
 
 class ArchiveExtractor:
     def __init__(self, directory):
         self.logger: logging.getLogger = get_logger(os.path.basename("archive_extractor").replace(".py", "_")
                                                     + str(datetime.now().date()))
+        self.input_data = None
         self.root_directory = directory
         self.dir_name = os.path.join(directory, 'archives')
         self.clear_directory()
@@ -292,17 +302,9 @@ class ArchiveExtractor:
             '.xlsx': self.read_excel_file,
             '.xls': self.read_excel_file,
             '.zip': self.unzip_archive,
-            '.rar': self.unrar_archive
+            '.rar': self.unrar_archive,
+            '': self.into_dirs
         }
-        
-    def clear_directory(self):
-        """
-
-        :return:
-        """
-        with contextlib.suppress(FileNotFoundError):
-            shutil.rmtree(self.dir_name)
-        os.makedirs(self.dir_name, exist_ok=True)
 
     def read_excel_file(self, file_path):
         """
@@ -311,7 +313,16 @@ class ArchiveExtractor:
         :return:
         """
         self.logger.info(f"Найден файл Excel: {file_path}")
-        DataExtractor(file_path, self.root_directory).read_excel_file()
+        DataExtractor(file_path, self.root_directory, self.input_data).read_excel_file()
+
+    def clear_directory(self):
+        """
+
+        :return:
+        """
+        with contextlib.suppress(FileNotFoundError):
+            shutil.rmtree(self.dir_name)
+        os.makedirs(self.dir_name, exist_ok=True)
 
     def save_archive(self, archive, file_info):
         """
@@ -333,6 +344,16 @@ class ArchiveExtractor:
             return inner_archive_filename
         except Exception as ex:
             self.logger.error(f"Ошибка при сохранении файла {file_info.filename}: {ex}. Path is {self.dir_name}")
+
+    def into_dirs(self, dir_name):
+        """
+        Entry to dir.
+        :param dir_name:
+        :return:
+        """
+        for item in os.listdir(dir_name):
+            item_path = os.path.join(dir_name, item)
+            self.process_archive(item_path)
 
     def unrar_archive(self, rar_file):
         """
@@ -364,7 +385,10 @@ class ArchiveExtractor:
         :param file_path:
         :return:
         """
-        _, ext = os.path.splitext(file_path)
+        if os.path.isdir(file_path):
+            _, ext = file_path, ''
+        else:
+            _, ext = os.path.splitext(file_path)
         handler: Callable[[dict], None]
         if handler := self.extension_handlers.get(ext):
             handler(file_path)
@@ -377,7 +401,8 @@ class ArchiveExtractor:
         :return:
         """
         for root, dirs, files in os.walk(self.root_directory):
-            for file in files:
+            for file in files + list(set(dirs) - set(BASE_DIRECTORIES)):
+                self.input_data = file
                 file_path: str = os.path.join(root, file)
                 self.process_archive(file_path)
                 done: str = os.path.join(root, "done")

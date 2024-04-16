@@ -18,6 +18,8 @@ DESTINATION_STATION_LABELS: Tuple = (
     "Address/ Адрес/ "
 )
 
+BASE_DIRECTORIES: list = ["errors_excel", "done", "archives", "json", "done_excel"]
+
 
 def get_my_env_var(var_name: str) -> str:
     try:
