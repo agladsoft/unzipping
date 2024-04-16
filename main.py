@@ -413,4 +413,4 @@ class ArchiveExtractor:
 
 if __name__ == '__main__':
     ArchiveExtractor(os.environ["XL_IDP_PATH_UNZIPPING"]).main()
-    # import sys; DataExtractor(sys.argv[1], sys.argv[2]).read_excel_file()
+    # import sys; DataExtractor(sys.argv[1], sys.argv[2], "Ноябрь.zip").read_excel_file()
