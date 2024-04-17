@@ -85,6 +85,7 @@ class DataExtractor:
         """
         if is_remove_spaces:
             return re.sub(r"\s+", "", row, flags=re.UNICODE).upper() if row else row
+        row: str = re.sub(r'[\u4e00-\u9fff]+', "", row) if row else row
         row: str = re.sub(r"\n", " ", row).strip() if row else row
         return re.sub(r" +", " ", row).strip() if row else row
 
