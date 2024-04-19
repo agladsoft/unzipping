@@ -1,12 +1,9 @@
-import re
 import json
 import shutil
 import zipfile
 import rarfile
-import contextlib
-from __init__ import *
 from pprint import pprint
-from datetime import datetime
+from unified_companies import *
 from typing import Dict, List, Optional, Callable
 
 
@@ -35,8 +32,7 @@ class DataExtractor:
             "price_per_piece": None,
             "total_cost": None
         }
-        self.logger: logging.getLogger = get_logger(os.path.basename("data_extractor").replace(".py", "_")
-                                                    + str(datetime.now().date()))
+        self.logger: logging.getLogger = get_logger(f"data_extractor {str(datetime.now().date())}")
 
     @staticmethod
     def _is_digit(x: str) -> bool:
@@ -158,9 +154,9 @@ class DataExtractor:
 
     def is_all_right_columns(self, context: dict) -> bool:
         if (
-                (context.get("seller") or context.get("seller_priority"))
-                and (context.get("buyer") or context.get("buyer_priority"))
-                and context.get("destination_station")
+                (context.get(HEADER_LABELS[0]) or context.get(HEADER_LABELS[1]))
+                and (context.get(HEADER_LABELS[2]) or context.get(HEADER_LABELS[3]))
+                and context.get(HEADER_LABELS[4])
         ):
             return True
         pprint(context)
@@ -210,18 +206,65 @@ class DataExtractor:
                             break
                         cell = self._remove_many_spaces(cell, is_remove_spaces=False)
                         context.setdefault(uni_columns, cell)
+                    break
                 elif self._remove_spaces_and_symbols(splitter_column[0]) in columns:
                     context[uni_columns] = splitter_column[-1].strip()
         return count_address
 
     @staticmethod
-    def unified_values(list_data: List[dict]):
-        for row in list_data:
-            for value in DICT_STATION['station']:
-                if value and value in row['destination_station'].upper():
-                    index: int = DICT_STATION['station'].index(value)
-                    row['destination_station'] = DICT_STATION['station_unified'][index]
-                    break
+    def unified_values(context: dict):
+        for value in DICT_STATION['station']:
+            if value and value in context['destination_station'].upper():
+                index: int = DICT_STATION['station'].index(value)
+                context['destination_station'] = DICT_STATION['station_unified'][index]
+                break
+
+        unified_companies = [
+            UnifiedRussianCompanies(),
+            UnifiedKazakhstanCompanies(),
+            UnifiedBelarusCompanies(),
+            UnifiedUzbekistanCompanies()
+        ]
+        obj_unified_company = None
+        for company in HEADER_LABELS[:4]:
+            if context.get(company):
+                taxpayer_id = None
+                if not taxpayer_id:
+                    all_digits: list = re.findall(r"\d+", context[company])
+                    for item_inn in all_digits:
+                        for unified_company in unified_companies:
+                            with contextlib.suppress(Exception):
+                                if unified_company.is_valid(item_inn):
+                                    taxpayer_id = item_inn
+                                    obj_unified_company = unified_company
+                                    break
+                if not taxpayer_id:
+                    taxpayer_id, obj_unified_company = SearchEngineParser(obj_unified_company).\
+                        get_company_by_taxpayer_id(context[company])
+                context[f"{company}_taxpayer_id"] = taxpayer_id
+                if obj_unified_company and not isinstance(obj_unified_company, str):
+                    if not (
+                            rows := obj_unified_company.cur.execute(
+                            f'SELECT * FROM "{obj_unified_company.table_name}" WHERE taxpayer_id=?',
+                            (taxpayer_id,), ).fetchall()
+                    ):
+                        company_name = obj_unified_company.get_company_by_taxpayer_id(taxpayer_id)
+                        context[f"{company}_unified"] = company_name
+                    else:
+                        context[f"{company}_unified"] = rows[0][1]
+                elif isinstance(obj_unified_company, str):
+                    for obj_company in unified_companies:
+                        if obj_unified_company == obj_company.__str__():
+                            if not (
+                                    rows := obj_company.cur.execute(
+                                        f'SELECT * FROM "{obj_company.table_name}" WHERE taxpayer_id=?',
+                                        (taxpayer_id,), ).fetchall()
+                            ):
+                                company_name = obj_company.get_company_by_taxpayer_id(taxpayer_id)
+                                context[f"{company}_unified"] = company_name
+                            else:
+                                context[f"{company}_unified"] = rows[0][1]
+                            break
 
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
         """
@@ -244,7 +287,7 @@ class DataExtractor:
             "input_data": self.input_data
         }
         if container_number := re.findall(r"[A-Z]{4}\d{7}", os.path.basename(self.filename)):
-            context["container_number"] = container_number[0]
+            context[HEADER_LABELS[5]] = container_number[0]
         return context
 
     def parse_rows(self, df: pd.DataFrame, list_data: List[dict]) -> Optional[List[dict]]:
@@ -262,12 +305,12 @@ class DataExtractor:
                 if self._get_probability_of_header(rows, self._get_list_columns()) >= COEFFICIENT_OF_HEADER_PROBABILITY:
                     if not self.is_all_right_columns(context):
                         return
+                    self.unified_values(context)
                     self._get_columns_position(rows)
                 elif self._is_table_starting(rows):
                     self._get_content_in_table(rows, list_data, context)
             except TypeError:
                 count_address = self._get_content_before_table(rows, context, count_address)
-        self.unified_values(list_data)
         return list_data
 
     def read_excel_file(self):
@@ -293,8 +336,7 @@ class DataExtractor:
 
 class ArchiveExtractor:
     def __init__(self, directory):
-        self.logger: logging.getLogger = get_logger(os.path.basename("archive_extractor").replace(".py", "_")
-                                                    + str(datetime.now().date()))
+        self.logger: logging.getLogger = get_logger(f"archive_extractor {str(datetime.now().date())}")
         self.input_data = None
         self.root_directory = directory
         self.dir_name = os.path.join(directory, 'archives')
