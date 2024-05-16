@@ -83,7 +83,7 @@ class DataExtractor:
             return re.sub(r"\s+", "", row, flags=re.UNICODE).upper() if row else row
         row: str = re.sub(r'[\u4e00-\u9fff]+', "", row) if row else row
         row: str = re.sub(r"\n", " ", row).strip() if row else row
-        return re.sub(r" +", " ", row).strip() if row else row
+        return re.sub(r"\s+", " ", row).strip() if row else row
 
     @staticmethod
     def _get_list_columns() -> List[str]:
@@ -219,53 +219,6 @@ class DataExtractor:
                 context['destination_station'] = DICT_STATION['station_unified'][index]
                 break
 
-        unified_companies = [
-            UnifiedRussianCompanies(),
-            UnifiedKazakhstanCompanies(),
-            UnifiedBelarusCompanies(),
-            UnifiedUzbekistanCompanies()
-        ]
-        obj_unified_company = None
-        for company in HEADER_LABELS[:4]:
-            if context.get(company):
-                taxpayer_id = None
-                if not taxpayer_id:
-                    all_digits: list = re.findall(r"\d+", context[company])
-                    for item_inn in all_digits:
-                        for unified_company in unified_companies:
-                            with contextlib.suppress(Exception):
-                                if unified_company.is_valid(item_inn):
-                                    taxpayer_id = item_inn
-                                    obj_unified_company = unified_company
-                                    break
-                if not taxpayer_id:
-                    taxpayer_id, obj_unified_company = SearchEngineParser(obj_unified_company).\
-                        get_company_by_taxpayer_id(context[company])
-                context[f"{company}_taxpayer_id"] = taxpayer_id
-                if obj_unified_company and not isinstance(obj_unified_company, str):
-                    if not (
-                            rows := obj_unified_company.cur.execute(
-                            f'SELECT * FROM "{obj_unified_company.table_name}" WHERE taxpayer_id=?',
-                            (taxpayer_id,), ).fetchall()
-                    ):
-                        company_name = obj_unified_company.get_company_by_taxpayer_id(taxpayer_id)
-                        context[f"{company}_unified"] = company_name
-                    else:
-                        context[f"{company}_unified"] = rows[0][1]
-                elif isinstance(obj_unified_company, str):
-                    for obj_company in unified_companies:
-                        if obj_unified_company == obj_company.__str__():
-                            if not (
-                                    rows := obj_company.cur.execute(
-                                        f'SELECT * FROM "{obj_company.table_name}" WHERE taxpayer_id=?',
-                                        (taxpayer_id,), ).fetchall()
-                            ):
-                                company_name = obj_company.get_company_by_taxpayer_id(taxpayer_id)
-                                context[f"{company}_unified"] = company_name
-                            else:
-                                context[f"{company}_unified"] = rows[0][1]
-                            break
-
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
         """
         Getting the data from the table.
@@ -305,7 +258,8 @@ class DataExtractor:
                 if self._get_probability_of_header(rows, self._get_list_columns()) >= COEFFICIENT_OF_HEADER_PROBABILITY:
                     if not self.is_all_right_columns(context):
                         return
-                    self.unified_values(context)
+                    # self.unified_values(context)
+                    UnifiedContextProcessor.unified_values(context)
                     self._get_columns_position(rows)
                 elif self._is_table_starting(rows):
                     self._get_content_in_table(rows, list_data, context)

@@ -10,14 +10,84 @@ from pathlib import Path
 from functools import reduce
 from datetime import datetime
 from bs4 import BeautifulSoup
-from requests import Response
 from operator import add, mul
 from stdnum.exceptions import *
 from dadata.sync import DadataClient
+from requests import Response, Session
 from stdnum.util import clean, isdigits
 import xml.etree.ElementTree as ElemTree
+from typing import Union, List, Optional
 from deep_translator import GoogleTranslator
-from typing import Union, Tuple, List, Optional
+
+
+logger = get_logger(f"unified_companies {str(datetime.now().date())}")
+
+
+class UnifiedCompaniesManager:
+    def __init__(self):
+        self.unified_companies = [
+            UnifiedRussianCompanies(),
+            UnifiedKazakhstanCompanies(),
+            UnifiedBelarusCompanies(),
+            UnifiedUzbekistanCompanies()
+        ]
+
+    def get_valid_company(self, company_data):
+        for unified_company in self.unified_companies:
+            with contextlib.suppress(Exception):
+                if unified_company.is_valid(company_data):
+                    return unified_company
+        return None
+
+    @staticmethod
+    def fetch_company_name(company, taxpayer_id):
+        rows = company.cur.execute(
+            f'SELECT * FROM "{company.table_name}" WHERE taxpayer_id=?',
+            (taxpayer_id,)
+        ).fetchall()
+        return rows[0][1] if rows else company.get_company_by_taxpayer_id(taxpayer_id)
+
+
+class UnifiedContextProcessor:
+    @staticmethod
+    def unified_values(context: dict):
+        UnifiedContextProcessor.unify_station(context)
+        UnifiedContextProcessor.unify_companies(context)
+
+    @staticmethod
+    def unify_station(context: dict):
+        for value in DICT_STATION['station']:
+            if value and value in context['destination_station'].upper():
+                index = DICT_STATION['station'].index(value)
+                context['destination_station'] = DICT_STATION['station_unified'][index]
+                break
+
+    @staticmethod
+    def unify_companies(context: dict):
+        manager = UnifiedCompaniesManager()
+
+        for company in HEADER_LABELS[:4]:
+            if company_data := context.get(company):
+                taxpayer_id = UnifiedContextProcessor.extract_taxpayer_id(company_data, manager)
+                context[f"{company}_taxpayer_id"] = taxpayer_id
+
+                if taxpayer_id:
+                    if unified_company := manager.get_valid_company(taxpayer_id):
+                        company_name = manager.fetch_company_name(unified_company, taxpayer_id)
+                        context[f"{company}_unified"] = company_name
+
+    @staticmethod
+    def extract_taxpayer_id(company_data, manager):
+        valid_company: Optional[object] = None
+        all_digits = re.findall(r"\d+", company_data)
+
+        for item_inn in all_digits:
+            if valid_company := manager.get_valid_company(item_inn):
+                return item_inn
+
+        # If no valid taxpayer ID found, use search engine
+        search_engine = SearchEngineParser(valid_company)
+        return search_engine.get_company_by_taxpayer_id(company_data)[0]
 
 
 class BaseUnifiedCompanies(abc.ABC):
@@ -58,6 +128,26 @@ class BaseUnifiedCompanies(abc.ABC):
             """)
         self.conn.commit()
         return cur
+
+    @staticmethod
+    def get_response(url, country, method="GET", data=None):
+        response: Optional[Response] = None
+        proxy: str = next(CYCLED_PROXIES)
+        used_proxy: Optional[str] = None
+        try:
+            session: Session = requests.Session()
+            session.proxies = {"http": proxy}
+            if method == "POST":
+                response = session.post(url, json=data, timeout=120)
+            else:
+                response = session.get(url, timeout=120)
+            logger.info(f"Статус запроса {response.status_code}. URL - {url}. Country - {country}")
+            used_proxy = session.proxies.get('http')  # или 'https', в зависимости от протокола
+            logger.info(f'Использованный прокси: {used_proxy}')
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            logger.error(f"An error occurred during the API request - {e}. Proxy - {used_proxy}.Text - {response.text}")
 
     def cache_add_and_save(self, taxpayer_id: str, company_name: str, country: str) -> None:
         """
@@ -135,8 +225,6 @@ class UnifiedRussianCompanies(BaseUnifiedCompanies):
         :param taxpayer_id:
         :return:
         """
-        logger: logging.getLogger = get_logger(f"unified_russian_companies {str(datetime.now().date())}")
-
         dadata: DadataClient = DadataClient(token=DADATA_TOKEN, secret=DADATA_SECRET)
         try:
             dadata_response: list = dadata.find_by_id("party", taxpayer_id)
@@ -172,7 +260,7 @@ class UnifiedKazakhstanCompanies(BaseUnifiedCompanies):
         return reduce(add, map(lambda i: mul(*i), zip(map(int, number), weights)))
 
     def is_valid(self, number):
-        if not re.match(r'[0-9]{12}', number):
+        if len(number) != 12:
             return False
         w1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         w2 = [3, 4, 5, 6, 7, 8, 9, 10, 11, 1, 2]
@@ -187,23 +275,20 @@ class UnifiedKazakhstanCompanies(BaseUnifiedCompanies):
         :param taxpayer_id:
         :return:
         """
-        logger: logging.getLogger = get_logger(f"unified_kazakhstan_companies {str(datetime.now().date())}")
-        url = 'https://statsnet.co/search/kz/'
-        answer = requests.get(f"{url}/{taxpayer_id}")
-        if answer.status_code != 200:
-            return None
-        soup = BeautifulSoup(answer.text)
-        a = soup.find_all('a', class_='text-lg sm:text-xl flex items-center gap-1 text-statsnet hover:text-orange '
-                                      'font-stem')[0]
-        name = a.find_next('h2').text.replace('\n', '').strip()
-        logger.info(f"Company name is {name}. IIN is {taxpayer_id}")
-        try:
-            company_name: str = GoogleTranslator(source='en', target='ru').translate(name[:4500])
-        except Exception as e:
-            logger.error(f"Exception is {e}")
-            company_name = name
-        self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
-        return company_name
+        data = {
+            "page": "1",
+            "size": 10,
+            "value": taxpayer_id
+        }
+        if response := self.get_response("https://pk.uchet.kz/api/web/company/search/", self.__str__(), method="POST",
+                                         data=data):
+            company_name: Optional[str] = None
+            for result in response.json()["results"]:
+                company_name = result["name"]
+                break
+            logger.info(f"Company name is {company_name}. BIN is {taxpayer_id}")
+            self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
+            return company_name
 
 
 class UnifiedBelarusCompanies(BaseUnifiedCompanies):
@@ -241,16 +326,13 @@ class UnifiedBelarusCompanies(BaseUnifiedCompanies):
         :param taxpayer_id:
         :return:
         """
-        logger: logging.getLogger = get_logger(f"unified_belarus_companies {str(datetime.now().date())}")
-        answer = requests.get(f"https://www.portal.nalog.gov.by/grp/getData?unp={taxpayer_id}&charset=UTF-8&type=json")
-        if answer.status_code != 200:
-            logger.error(f"Status code is {answer.status_code}")
-            return None
-        answer = answer.json()['row']
-        data = {'unp': answer['vunp'], 'company_name': answer['vnaimk']}
-        logger.info(f"Company name is {data['company_name']}. UNP is {taxpayer_id}")
-        self.cache_add_and_save(taxpayer_id, data['company_name'], self.__str__())
-        return data['company_name']
+        if response := self.get_response(f"https://www.portal.nalog.gov.by/grp/getData?unp="
+                                         f"{taxpayer_id}&charset=UTF-8&type=json", self.__str__()):
+            row = response.json()['row']
+            data = {'unp': row['vunp'], 'company_name': row['vnaimk']}
+            logger.info(f"Company name is {data['company_name']}. UNP is {taxpayer_id}")
+            self.cache_add_and_save(taxpayer_id, data['company_name'], self.__str__())
+            return data['company_name']
 
 
 class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
@@ -272,21 +354,18 @@ class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
         :param taxpayer_id:
         :return:
         """
-        logger: logging.getLogger = get_logger(f"unified_uzbekistan_companies {str(datetime.now().date())}")
-        answer = requests.get(f"http://orginfo.uz/en/search/all?q={taxpayer_id}", timeout=180)
-        if answer.status_code != 200:
-            return None
-        soup = BeautifulSoup(answer.text, "html.parser")
-        a = soup.find_all('div', class_='card-body pt-0')[-1]
-        name = a.find_next('h6', class_='card-title').text.replace('\n', '').strip()
-        logger.info(f"Company name is {name}. INN is {taxpayer_id}")
-        try:
-            company_name: str = GoogleTranslator(source='uz', target='ru').translate(name[:4500])
-        except Exception as e:
-            logger.error(f"Exception is {e}")
-            company_name = name
-        self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
-        return company_name
+        if response := self.get_response(f"http://orginfo.uz/en/search/all?q={taxpayer_id}", self.__str__()):
+            soup = BeautifulSoup(response.text, "html.parser")
+            a = soup.find_all('div', class_='card-body pt-0')[-1]
+            name = a.find_next('h6', class_='card-title').text.replace('\n', '').strip()
+            logger.info(f"Company name is {name}. INN is {taxpayer_id}")
+            try:
+                company_name: str = GoogleTranslator(source='uz', target='ru').translate(name[:4500])
+            except Exception as e:
+                logger.error(f"Exception is {e}")
+                company_name = name
+            self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
+            return company_name
 
 
 class SearchEngineParser(BaseUnifiedCompanies):
@@ -295,43 +374,25 @@ class SearchEngineParser(BaseUnifiedCompanies):
         self.table_name = "search_engine"
         self.cur: sqlite3.Cursor = self.load_cache()
         self.unified_company = unified_company
-        self.logger: logging.getLogger = get_logger(f"unified_companies {str(datetime.now().date())}")
 
     def is_valid(self, number: str) -> bool:
         pass
 
-    def get_inn_from_site(self, dict_inn: dict, values: list, count_inn: int) -> None:
+    def get_inn_from_site(self, dict_inn: dict, values: list, count_inn: int, unified_companies) -> None:
         """
         Parse each site (description and title).
         """
-        unified_companies = [
-            UnifiedRussianCompanies(),
-            UnifiedKazakhstanCompanies(),
-            UnifiedBelarusCompanies(),
-            UnifiedUzbekistanCompanies()
-        ]
         for item_inn in values:
             for unified_company in unified_companies:
                 with contextlib.suppress(Exception):
-                    if self.unified_company and self.unified_company.is_valid(item_inn):
+                    if self.unified_company and unified_company.is_valid(item_inn):
                         dict_inn[item_inn] = dict_inn[item_inn] + 1 if item_inn in dict_inn else count_inn
-                    if unified_company.is_valid(item_inn):
+                    elif unified_company.is_valid(item_inn):
                         self.unified_company = unified_company
                         dict_inn[item_inn] = dict_inn[item_inn] + 1 if item_inn in dict_inn else count_inn
 
-    def get_inn_from_html(self, myroot: ElemTree, index_page: int, results: int, dict_inn: dict, count_inn: int) \
-            -> None:
-        """
-        Parsing the html page of the search engine with the found queries.
-        """
-        value: str = myroot[0][index_page][0][results][1][3][0].text
-        title: str = myroot[0][index_page][0][results][1][1].text
-        inn_text: list = re.findall(r"\d+", value)
-        inn_title: list = re.findall(r"\d+", title)
-        self.get_inn_from_site(dict_inn, inn_text, count_inn)
-        self.get_inn_from_site(dict_inn, inn_title, count_inn)
-
-    def get_code_error(self, error_code: ElemTree, value: str) -> None:
+    @staticmethod
+    def get_code_error(error_code: ElemTree, value: str) -> None:
         """
         Getting error codes from xml_river.
         """
@@ -341,70 +402,71 @@ class SearchEngineParser(BaseUnifiedCompanies):
                                                       "Value - {}. Error code - {}")
             message = message.format(error_code.text, value, code)
             prefix: str = PREFIX_TEMPLATE.get(code, "необработанная_ошибка_на_строке_")
-            self.logger.error(f"{message}. {prefix}")
+            logger.error(f"{message}. {prefix}")
             if code == '200':
                 raise AssertionError(message)
             elif code == '110' or code != '15':
-                self.logger.error(f"Error code is {code}")
+                logger.error(f"Error code is {code}")
 
-    def parse_xml(self, response: Response, value: str) -> Tuple[ElemTree.Element, int, int]:
+    def parse_xml(self, response: Response, value: str, dict_inn: dict, count_inn: int, unified_companies):
         """
         Parsing xml.
         """
-        myroot: ElemTree = ElemTree.fromstring(response.text)
-        self.get_code_error(myroot[0][0], value)
-        index_page: int = 2 if myroot[0][1].tag == 'correct' else 1
-        try:
-            last_range: int = int(myroot[0][index_page][0][0].attrib['last'])
-        except IndexError as index_err:
-            self.logger.warning(f"The request to Yandex has been corrected, so we are shifting the index. "
-                                f"Exception - {index_err}")
-            index_page += + 1
-            last_range = int(myroot[0][index_page][0][0].attrib['last'])
-        return myroot, index_page, last_range
+        # Parse the XML data
+        root = ElemTree.fromstring(response.text)
+        self.get_code_error(root[0][0], value)
+
+        # Find all title and passage elements
+        for doc in root.findall(".//doc"):
+            title = doc.find('title').text or ''
+            passage = doc.find('.//passage').text or ''
+            inn_text: list = re.findall(r"\d+", passage)
+            inn_title: list = re.findall(r"\d+", title)
+            self.get_inn_from_site(dict_inn, inn_text, count_inn, unified_companies)
+            self.get_inn_from_site(dict_inn, inn_title, count_inn, unified_companies)
 
     def get_inn_from_search_engine(self, value: str) -> dict:
         """
         Looking for the INN in the search engine, and then we parse through the sites.
         """
-        self.logger.info(f"Before request. Data is {value}")
+        logger.info(f"Before request. Data is {value}")
         try:
             r: Response = requests.get(f"https://xmlriver.com/search_yandex/xml?user={USER_XML_RIVER}"
                                        f"&key={KEY_XML_RIVER}&query={value} ИНН", timeout=120)
         except Exception as e:
-            self.logger.error(f"Run time out. Data is {value}. Exception is {e}")
+            logger.error(f"Run time out. Data is {value}. Exception is {e}")
             raise AssertionError from e
-        self.logger.info(f"After request. Data is {value}")
-        myroot, index_page, last_range = self.parse_xml(r, value)
+        logger.info(f"After request. Data is {value}")
         dict_inn: dict = {}
         count_inn: int = 1
-        for results in range(1, last_range):
-            try:
-                self.get_inn_from_html(myroot, index_page, results, dict_inn, count_inn)
-            except Exception as ex:
-                self.logger.warning(f"Description {value} not found in the Yandex. Exception - {ex}")
-        self.logger.info(f"Dictionary with INN is {dict_inn}. Data is {value}")
+        unified_companies = [
+            UnifiedRussianCompanies(),
+            UnifiedKazakhstanCompanies(),
+            UnifiedBelarusCompanies(),
+            UnifiedUzbekistanCompanies()
+        ]
+        self.parse_xml(r, value, dict_inn, count_inn, unified_companies)
+        logger.info(f"Dictionary with INN is {dict_inn}. Data is {value}")
         return dict_inn
 
     def get_company_by_taxpayer_id(self, value: str):
         """
         Getting the INN from the cache, if there is one. Otherwise, we search in the search engine.
         """
+        # value = GoogleTranslator(source='en', target='ru').translate(value[:4500])
+        value = re.sub(" +", " ", value.translate({ord(c): " " for c in r".,!@#$%^&*()[]{};?\|~=_+"})).strip()
         rows: sqlite3.Cursor = self.cur.execute(f'SELECT * FROM "{self.table_name}" WHERE taxpayer_id=?', (value,), )
-        list_rows: list = list(rows)
-        if list_rows and list_rows[0][1] != "None":
-            self.logger.info(f"Data is {list_rows[0][0]}. INN is {list_rows[0][1]}")
+        if list_rows := list(rows):
+            logger.info(f"Data is {list_rows[0][0]}. INN is {list_rows[0][1]}")
             return list_rows[0][1], list_rows[0][2]
         api_inn: dict = self.get_inn_from_search_engine(value)
-        for inn in api_inn.items():
-            with contextlib.suppress(Exception):
-                if api_inn == 'None':
-                    sql_update_query: str = f"""Update {self.table_name} set value = ? where key = ?"""
-                    data: Tuple[str, str] = (inn[1], value)
-                    self.cur.execute(sql_update_query, data)
-                    self.conn.commit()
-            self.cache_add_and_save(value, inn[0], self.unified_company.__str__())
-        return max(api_inn, default=None), self.unified_company
+        best_found_inn = max(api_inn, key=api_inn.get, default=None)
+        self.cache_add_and_save(
+            value,
+            best_found_inn,
+            self.unified_company.__str__() if self.unified_company else self.unified_company
+        )
+        return best_found_inn, self.unified_company
 
 
 if __name__ == "__main__":

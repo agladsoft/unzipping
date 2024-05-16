@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 from typing import Tuple
+from itertools import cycle
 from logging.handlers import RotatingFileHandler
 
 LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
@@ -37,6 +38,21 @@ PREFIX_TEMPLATE: dict = {
     '110': "нет_свободных_каналов_на_строке_",
     '15': "не_найдено_результатов_"
 }
+
+PROXIES: list = [
+    # 'http://user139922:oulrqa@146.247.118.67:6330',
+    # 'http://user139922:oulrqa@146.247.107.158:6330',
+    # 'http://user139922:oulrqa@103.47.57.114:6330',
+    # 'http://user139922:oulrqa@179.61.158.246:6330',
+    # 'http://user139922:oulrqa@146.247.111.20:6330',
+    'http://user139922:oulrqa@45.152.240.253:6330',
+    'http://user139922:oulrqa@45.152.240.220:6330',
+    'http://user139922:oulrqa@45.152.241.48:6330',
+    'http://user139922:oulrqa@45.152.240.105:6330',
+    'http://user139922:oulrqa@45.152.240.212:6330',
+    'http://MVlxrzOVPf:YKinSyphbo@195.201.106.30:12400'
+]
+CYCLED_PROXIES: cycle = cycle(PROXIES)
 
 
 def get_my_env_var(var_name: str) -> str:
