@@ -357,7 +357,8 @@ class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
         if response := self.get_response(f"http://orginfo.uz/en/search/all?q={taxpayer_id}", self.__str__()):
             soup = BeautifulSoup(response.text, "html.parser")
             a = soup.find_all('div', class_='card-body pt-0')[-1]
-            name = a.find_next('h6', class_='card-title').text.replace('\n', '').strip()
+            if name := a.find_next('h6', class_='card-title'):
+                name = name.text.replace('\n', '').strip()
             logger.info(f"Company name is {name}. INN is {taxpayer_id}")
             try:
                 company_name: str = GoogleTranslator(source='uz', target='ru').translate(name[:4500])
