@@ -307,7 +307,7 @@ class UnifiedBelarusCompanies(BaseUnifiedCompanies):
         :param number:
         :return:
         """
-        if len(number) != 9:
+        if len(number) != 9 or number == '000000000':
             return False
 
         weights = [29, 23, 19, 17, 13, 7, 5, 3]
@@ -403,11 +403,11 @@ class SearchEngineParser(BaseUnifiedCompanies):
                                                       "Value - {}. Error code - {}")
             message = message.format(error_code.text, value, code)
             prefix: str = PREFIX_TEMPLATE.get(code, "необработанная_ошибка_на_строке_")
-            logger.error(f"{message}. {prefix}")
+            logger.error(f"Error code is {code}. Message is {message}. Prefix is {prefix}")
             if code == '200':
                 raise AssertionError(message)
             elif code == '110' or code != '15':
-                logger.error(f"Error code is {code}")
+                raise ConnectionRefusedError(message)
 
     def parse_xml(self, response: Response, value: str, dict_inn: dict, count_inn: int, unified_companies):
         """
@@ -460,13 +460,16 @@ class SearchEngineParser(BaseUnifiedCompanies):
         if list_rows := list(rows):
             logger.info(f"Data is {list_rows[0][0]}. INN is {list_rows[0][1]}")
             return list_rows[0][1], list_rows[0][2]
-        api_inn: dict = self.get_inn_from_search_engine(value)
-        best_found_inn = max(api_inn, key=api_inn.get, default=None)
-        self.cache_add_and_save(
-            value,
-            best_found_inn,
-            self.unified_company.__str__() if self.unified_company else self.unified_company
-        )
+        try:
+            api_inn: dict = self.get_inn_from_search_engine(value)
+            best_found_inn = max(api_inn, key=api_inn.get, default=None)
+            self.cache_add_and_save(
+                value,
+                best_found_inn,
+                self.unified_company.__str__() if self.unified_company else self.unified_company
+            )
+        except ConnectionRefusedError:
+            best_found_inn = None
         return best_found_inn, self.unified_company
 
 
