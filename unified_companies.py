@@ -45,7 +45,7 @@ class UnifiedCompaniesManager:
             f'SELECT * FROM "{company.table_name}" WHERE taxpayer_id=?',
             (taxpayer_id,)
         ).fetchall()
-        return rows[0][1] if rows else company.get_company_by_taxpayer_id(taxpayer_id)
+        return rows[0][1] if rows else company.get_company_by_taxpayer_id(taxpayer_id, 3)
 
 
 class UnifiedContextProcessor:
@@ -87,7 +87,7 @@ class UnifiedContextProcessor:
 
         # If no valid taxpayer ID found, use search engine
         search_engine = SearchEngineParser(valid_company)
-        return search_engine.get_company_by_taxpayer_id(company_data)[0]
+        return search_engine.get_company_by_taxpayer_id(company_data, 3)[0]
 
 
 class BaseUnifiedCompanies(abc.ABC):
@@ -101,7 +101,7 @@ class BaseUnifiedCompanies(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_company_by_taxpayer_id(self, taxpayer_id: str) -> Optional[str]:
+    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int) -> Optional[str]:
         pass
 
     @staticmethod
@@ -218,11 +218,12 @@ class UnifiedRussianCompanies(BaseUnifiedCompanies):
         except ValidationError:
             return False
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str) -> Optional[str]:
+    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int) -> Optional[str]:
         """
         Getting the company name unified from the cache, if there is one.
         Otherwise, we are looking for verification of legal entities on websites.
         :param taxpayer_id:
+        :param number_attempts:
         :return:
         """
         dadata: DadataClient = DadataClient(token=DADATA_TOKEN, secret=DADATA_SECRET)
@@ -269,10 +270,11 @@ class UnifiedKazakhstanCompanies(BaseUnifiedCompanies):
             check_sum = self.multiply(w2, number) % 11
         return check_sum == int(number[-1])
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str):
+    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
         """
         
         :param taxpayer_id:
+        :param number_attempts:
         :return:
         """
         data = {
@@ -320,10 +322,11 @@ class UnifiedBelarusCompanies(BaseUnifiedCompanies):
 
         return checksum == int(number[-1])
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str):
+    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
         """
         
         :param taxpayer_id:
+        :param number_attempts:
         :return:
         """
         if response := self.get_response(f"https://www.portal.nalog.gov.by/grp/getData?unp="
@@ -348,10 +351,11 @@ class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
     def is_valid(self, number):
         return False if len(number) != 9 else bool(re.match(r'[3-8]', number))
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str):
+    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
         """
 
         :param taxpayer_id:
+        :param number_attempts:
         :return:
         """
         if response := self.get_response(f"http://orginfo.uz/en/search/all?q={taxpayer_id}", self.__str__()):
@@ -450,10 +454,13 @@ class SearchEngineParser(BaseUnifiedCompanies):
         logger.info(f"Dictionary with INN is {dict_inn}. Data is {value}")
         return dict_inn
 
-    def get_company_by_taxpayer_id(self, value: str):
+    def get_company_by_taxpayer_id(self, value: str, number_attempts: int):
         """
         Getting the INN from the cache, if there is one. Otherwise, we search in the search engine.
         """
+        best_found_inn = None
+        if number_attempts == 0:
+            return best_found_inn, self.unified_company
         unwanted_chars = r"[<>\«\»\’\‘\“\”`'\".,!@#$%^&*()\[\]{};?\|~=_+]+"
         value = re.sub(unwanted_chars, "", value)
         value = re.sub(" +", " ", value).strip()
@@ -470,7 +477,8 @@ class SearchEngineParser(BaseUnifiedCompanies):
                 self.unified_company.__str__() if self.unified_company else self.unified_company
             )
         except ConnectionRefusedError:
-            best_found_inn = None
+            time.sleep(60)
+            self.get_company_by_taxpayer_id(value, number_attempts - 1)
         return best_found_inn, self.unified_company
 
 
