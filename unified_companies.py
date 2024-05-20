@@ -454,8 +454,9 @@ class SearchEngineParser(BaseUnifiedCompanies):
         """
         Getting the INN from the cache, if there is one. Otherwise, we search in the search engine.
         """
-        # value = GoogleTranslator(source='en', target='ru').translate(value[:4500])
-        value = re.sub(" +", " ", value.translate({ord(c): " " for c in r".,!@#$%^&*()[]{};?\|~=_+"})).strip()
+        unwanted_chars = r"[<>\«\»\’\‘\“\”`'\".,!@#$%^&*()\[\]{};?\|~=_+]+"
+        value = re.sub(unwanted_chars, "", value)
+        value = re.sub(" +", " ", value).strip()
         rows: sqlite3.Cursor = self.cur.execute(f'SELECT * FROM "{self.table_name}" WHERE taxpayer_id=?', (value,), )
         if list_rows := list(rows):
             logger.info(f"Data is {list_rows[0][0]}. INN is {list_rows[0][1]}")
