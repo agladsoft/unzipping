@@ -406,7 +406,7 @@ class SearchEngineParser(BaseUnifiedCompanies):
             logger.error(f"Error code is {code}. Message is {message}. Prefix is {prefix}")
             if code == '200':
                 raise AssertionError(message)
-            elif code == '110' or code != '15':
+            elif code == '110' or code == '111' or code != '15':
                 raise ConnectionRefusedError(message)
 
     def parse_xml(self, response: Response, value: str, dict_inn: dict, count_inn: int, unified_companies):
