@@ -30,27 +30,23 @@ DADATA_SECRET: str = "3c905f3b5b6291c65d323e3b774e7b8f6d1b7919"
 MESSAGE_TEMPLATE: dict = {
     '200': "The money ran out. Index is {}. Exception - {}. Value - {}",
     '110': "There are no free channels for data collection. Index is {}. Exception - {}. Value - {}",
+    '111': "There are no free channels for data collection. Index is {}. Exception - {}. Value - {}",
     '15': "No results found in the search engine. Index is {}. Exception - {}. Value - {}"
 }
 
 PREFIX_TEMPLATE: dict = {
     '200': "закончились_деньги_на_строке_",
     '110': "нет_свободных_каналов_на_строке_",
+    '111': "нет_свободных_каналов_на_строке_",
     '15': "не_найдено_результатов_"
 }
 
 PROXIES: list = [
-    # 'http://user139922:oulrqa@146.247.118.67:6330',
-    # 'http://user139922:oulrqa@146.247.107.158:6330',
-    # 'http://user139922:oulrqa@103.47.57.114:6330',
-    # 'http://user139922:oulrqa@179.61.158.246:6330',
-    # 'http://user139922:oulrqa@146.247.111.20:6330',
-    'http://user139922:oulrqa@45.152.240.253:6330',
-    'http://user139922:oulrqa@45.152.240.220:6330',
-    'http://user139922:oulrqa@45.152.241.48:6330',
-    'http://user139922:oulrqa@45.152.240.105:6330',
-    'http://user139922:oulrqa@45.152.240.212:6330',
-    'http://MVlxrzOVPf:YKinSyphbo@195.201.106.30:12400'
+    'http://user139922:oulrqa@181.215.227.151:1866',
+    'http://user139922:oulrqa@181.215.227.145:1866',
+    'http://user139922:oulrqa@181.215.227.225:1866',
+    'http://user139922:oulrqa@181.215.227.93:1866',
+    'http://user139922:oulrqa@181.215.227.198:1866'
 ]
 CYCLED_PROXIES: cycle = cycle(PROXIES)
 
