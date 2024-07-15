@@ -1,7 +1,6 @@
 import re
 import abc
 import time
-import httpx
 import sqlite3
 import requests
 import contextlib
@@ -12,7 +11,6 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from operator import add, mul
 from stdnum.exceptions import *
-from dadata.sync import DadataClient
 from requests import Response, Session
 from stdnum.util import clean, isdigits
 import xml.etree.ElementTree as ElemTree
@@ -36,16 +34,18 @@ class UnifiedCompaniesManager:
         for unified_company in self.unified_companies:
             with contextlib.suppress(Exception):
                 if unified_company.is_valid(company_data):
-                    return unified_company
-        return None
+                    yield unified_company
 
     @staticmethod
-    def fetch_company_name(company, taxpayer_id):
-        rows = company.cur.execute(
-            f'SELECT * FROM "{company.table_name}" WHERE taxpayer_id=?',
-            (taxpayer_id,)
-        ).fetchall()
-        return rows[0][1] if rows else company.get_company_by_taxpayer_id(taxpayer_id, 3)
+    def fetch_company_name(companies, taxpayer_id):
+        for company in companies:
+            if rows := company.cur.execute(
+                f'SELECT * FROM "{company.table_name}" WHERE taxpayer_id=?',
+                (taxpayer_id,),
+            ).fetchall():
+                yield rows[0][1], rows[0][2], rows[0][3]
+            else:
+                yield company.get_company_by_taxpayer_id(taxpayer_id, 3)
 
 
 class UnifiedContextProcessor:
@@ -72,22 +72,26 @@ class UnifiedContextProcessor:
                 context[f"{company}_taxpayer_id"] = taxpayer_id
 
                 if taxpayer_id:
-                    if unified_company := manager.get_valid_company(taxpayer_id):
-                        company_name = manager.fetch_company_name(unified_company, taxpayer_id)
-                        context[f"{company}_unified"] = company_name
+                    if unified_company := list(manager.get_valid_company(taxpayer_id)):
+                        company_names = list(manager.fetch_company_name(unified_company, taxpayer_id))
+                        for company_name, phone_number, email in company_names:
+                            if company_name is not None:
+                                context[f"{company}_unified"] = company_name
+                                context["phone_number"] = phone_number
+                                context["email"] = email
 
     @staticmethod
     def extract_taxpayer_id(company_data, manager):
-        valid_company: Optional[object] = None
+        valid_company: Optional[object] = []
         all_digits = re.findall(r"\d+", company_data)
 
         for item_inn in all_digits:
-            if valid_company := manager.get_valid_company(item_inn):
+            if valid_company := list(manager.get_valid_company(item_inn)):
                 return item_inn
 
         # If no valid taxpayer ID found, use search engine
-        search_engine = SearchEngineParser(valid_company)
-        return search_engine.get_company_by_taxpayer_id(company_data, 3)[0]
+        search_engine = SearchEngineParser(valid_company, manager)
+        return search_engine.get_company_by_taxpayer_id(company_data, 3)
 
 
 class BaseUnifiedCompanies(abc.ABC):
@@ -124,6 +128,8 @@ class BaseUnifiedCompanies(abc.ABC):
         cur.execute(f"""CREATE TABLE IF NOT EXISTS {self.table_name}(
                taxpayer_id TEXT PRIMARY KEY,
                company_name TEXT,
+               phone_number TEXT,
+               email TEXT,
                country TEXT)
             """)
         self.conn.commit()
@@ -131,12 +137,11 @@ class BaseUnifiedCompanies(abc.ABC):
 
     @staticmethod
     def get_response(url, country, method="GET", data=None):
-        response: Optional[Response] = None
-        proxy: str = next(CYCLED_PROXIES)
+        # proxy: str = next(CYCLED_PROXIES)
         used_proxy: Optional[str] = None
         try:
             session: Session = requests.Session()
-            session.proxies = {"http": proxy}
+            # session.proxies = {"http": proxy}
             if method == "POST":
                 response = session.post(url, json=data, timeout=120)
             else:
@@ -147,14 +152,22 @@ class BaseUnifiedCompanies(abc.ABC):
             response.raise_for_status()
             return response
         except requests.exceptions.RequestException as e:
-            logger.error(f"An error occurred during the API request - {e}. Proxy - {used_proxy}.Text - {response.text}")
+            logger.error(f"An error occurred during the API request - {e}. Proxy - {used_proxy}.")
 
-    def cache_add_and_save(self, taxpayer_id: str, company_name: str, country: str) -> None:
+    def cache_add_and_save(
+            self,
+            taxpayer_id: str,
+            company_name: str,
+            phone_number: str = None,
+            email: str = None,
+            country: str = None
+    ) -> None:
         """
         Saving and adding the result to the cache.
         """
-        self.cur.executemany(f"INSERT or REPLACE INTO {self.table_name} VALUES(?, ?, ?)",
-                             [(taxpayer_id, company_name, country)])
+        logger.info(f"Saving data to cache. Table is {self.table_name}. Data is {taxpayer_id}")
+        self.cur.executemany(f"INSERT or REPLACE INTO {self.table_name} VALUES(?, ?, ?, ?, ?)",
+                             [(taxpayer_id, company_name, phone_number, email, country)])
         self.conn.commit()
 
 
@@ -218,7 +231,8 @@ class UnifiedRussianCompanies(BaseUnifiedCompanies):
         except ValidationError:
             return False
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int) -> Optional[str]:
+    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
+        # sourcery skip: extract-method
         """
         Getting the company name unified from the cache, if there is one.
         Otherwise, we are looking for verification of legal entities on websites.
@@ -226,24 +240,24 @@ class UnifiedRussianCompanies(BaseUnifiedCompanies):
         :param number_attempts:
         :return:
         """
-        dadata: DadataClient = DadataClient(token=DADATA_TOKEN, secret=DADATA_SECRET)
-        try:
-            dadata_response: list = dadata.find_by_id("party", taxpayer_id)
-        except httpx.ConnectError as ex_connect:
-            logger.error(f"Failed to connect dadata {ex_connect}. Type error is {type(ex_connect)}. "
-                         f"INN is {taxpayer_id}")
-            time.sleep(30)
-            dadata_response = dadata.find_by_id("party", taxpayer_id)
-        except Exception as ex_all:
-            logger.error(f"Unknown error in dadata {ex_all}. Type error is {type(ex_all)}. INN is {taxpayer_id}")
-            return None
-        if dadata_response:
-            company_name = dadata_response[0].get('value')
+        if not (response := self.get_response(f"https://checko.ru/search?query={taxpayer_id}", self.__str__())):
+            return None, None, None
+        soup = BeautifulSoup(response.text, "html.parser")
+        if company_name_tag := soup.find('h1', class_='mb-3'):
+            company_name = company_name_tag.text.strip()
+    
+            phone_links = soup.find_all('a', href=lambda href: href and href.startswith('tel'))
+            email_links = soup.find_all('a', href=lambda href: href and href.startswith('mailto'))
+            list_phone_numbers = [phone_link.text.strip() for phone_link in phone_links]
+            list_emails = [email_link.text.strip() for email_link in email_links]
+    
+            phone_number = "\n".join(list_phone_numbers) if list_phone_numbers else None
+            email = "\n".join(list_emails) if list_emails else None
             logger.info(f"Company name is {company_name}. INN is {taxpayer_id}")
-            self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
+            self.cache_add_and_save(taxpayer_id, company_name, phone_number, email, self.__str__())
+            return company_name, phone_number, email
         else:
-            company_name = None
-        return company_name
+            return None, None, None
 
 
 class UnifiedKazakhstanCompanies(BaseUnifiedCompanies):
@@ -271,31 +285,31 @@ class UnifiedKazakhstanCompanies(BaseUnifiedCompanies):
         return check_sum == int(number[-1])
 
     def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
+        # sourcery skip: extract-method
         """
         
         :param taxpayer_id:
         :param number_attempts:
         :return:
         """
-        data = {
-            "page": "1",
-            "size": 10,
-            "value": taxpayer_id
-        }
-        if response := self.get_response("https://pk.uchet.kz/api/web/company/search/", self.__str__(), method="POST",
-                                         data=data):
-            company_name: Optional[str] = None
-            for result in response.json()["results"]:
-                company_name = result["name"]
-                break
+        response_company = self.get_response(f"https://gateway.kompra.kz/company/{taxpayer_id}", self.__str__())
+        response_contacts = self.get_response(f"https://gateway.kompra.kz/contacts/{taxpayer_id}", self.__str__())
+        if response_company and response_contacts:
+            company_name: str = response_company.json().get("name")
+            response_json = response_contacts.json()
+            phone_number = "\n".join(response_json.get('phones', [])) or None
+            email = "\n".join(response_json.get('emails', [])) or None
             logger.info(f"Company name is {company_name}. BIN is {taxpayer_id}")
-            self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
-            return company_name
+            self.cache_add_and_save(taxpayer_id, company_name, phone_number, email, self.__str__())
+            return company_name, phone_number, email
+        else:
+            return None, None, None
 
 
 class UnifiedBelarusCompanies(BaseUnifiedCompanies):
     def __init__(self):
         super().__init__()
+        self.russian_companies = UnifiedRussianCompanies()
 
     def __str__(self):
         return "belarus"
@@ -329,13 +343,7 @@ class UnifiedBelarusCompanies(BaseUnifiedCompanies):
         :param number_attempts:
         :return:
         """
-        if response := self.get_response(f"https://www.portal.nalog.gov.by/grp/getData?unp="
-                                         f"{taxpayer_id}&charset=UTF-8&type=json", self.__str__()):
-            row = response.json()['row']
-            data = {'unp': row['vunp'], 'company_name': row['vnaimk']}
-            logger.info(f"Company name is {data['company_name']}. UNP is {taxpayer_id}")
-            self.cache_add_and_save(taxpayer_id, data['company_name'], self.__str__())
-            return data['company_name']
+        return self.russian_companies.get_company_by_taxpayer_id(taxpayer_id, number_attempts)
 
 
 class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
@@ -351,6 +359,14 @@ class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
     def is_valid(self, number):
         return False if len(number) != 9 else bool(re.match(r'[3-8]', number))
 
+    @staticmethod
+    def decode_cf_email(encoded_email):
+        r = int(encoded_email[:2], 16)
+        return ''.join(
+            chr(int(encoded_email[i:i + 2], 16) ^ r)
+            for i in range(2, len(encoded_email), 2)
+        )
+
     def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
         """
 
@@ -358,43 +374,52 @@ class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
         :param number_attempts:
         :return:
         """
-        if response := self.get_response(f"http://orginfo.uz/en/search/all?q={taxpayer_id}", self.__str__()):
-            soup = BeautifulSoup(response.text, "html.parser")
-            a = soup.find_all('div', class_='card-body pt-0')[-1]
-            if name := a.find_next('h6', class_='card-title'):
-                name = name.text.replace('\n', '').strip()
-            logger.info(f"Company name is {name}. INN is {taxpayer_id}")
-            try:
-                company_name: str = GoogleTranslator(source='uz', target='ru').translate(name[:4500])
-            except Exception as e:
-                logger.error(f"Exception is {e}")
-                company_name = name
-            self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
-            return company_name
+        if not (response := self.get_response(f"http://orginfo.uz/en/search/all?q={taxpayer_id}", self.__str__())):
+            return None, None, None
+        soup = BeautifulSoup(response.text, "html.parser")
+        if a := soup.find_all('a', class_='text-decoration-none og-card'):
+            return self._extracted_from_get_company_by_taxpayer_id(a, taxpayer_id)
+        else:
+            return None, None, None
+
+    def _extracted_from_get_company_by_taxpayer_id(self, a, taxpayer_id):
+        link = a[0].get('href')
+        response_link = requests.get(f"https://orginfo.uz{link}")
+        soup_link = BeautifulSoup(response_link.text, 'html.parser')
+        contacts = soup_link.find_all("a", class_="__cf_email__")
+        element = [element['data-cfemail'] for element in contacts]
+        company_name = soup_link.find('h1', class_='h1-seo').text
+        phone_number = soup_link.find('a', class_='text-decoration-none text-body-hover text-success').text
+        email = self.decode_cf_email(element[0]) if element else None
+        logger.info(f"Company name is {company_name}. INN is {taxpayer_id}")
+        try:
+            company_name: str = GoogleTranslator(source='uz', target='ru').translate(company_name[:4500])
+        except Exception as e:
+            logger.error(f"Exception is {e}")
+        self.cache_add_and_save(taxpayer_id, company_name, phone_number, email, self.__str__())
+        return company_name, phone_number, email
 
 
 class SearchEngineParser(BaseUnifiedCompanies):
-    def __init__(self, unified_company):
+    def __init__(self, country, manager):
         super().__init__()
         self.table_name = "search_engine"
         self.cur: sqlite3.Cursor = self.load_cache()
-        self.unified_company = unified_company
+        self.country = country
+        self.manager = manager
 
     def is_valid(self, number: str) -> bool:
         pass
 
-    def get_inn_from_site(self, dict_inn: dict, values: list, count_inn: int, unified_companies) -> None:
+    def get_inn_from_site(self, dict_inn: dict, values: list, count_inn: int) -> None:
         """
         Parse each site (description and title).
         """
         for item_inn in values:
-            for unified_company in unified_companies:
-                with contextlib.suppress(Exception):
-                    if self.unified_company and unified_company.is_valid(item_inn):
-                        dict_inn[item_inn] = dict_inn[item_inn] + 1 if item_inn in dict_inn else count_inn
-                    elif unified_company.is_valid(item_inn):
-                        self.unified_company = unified_company
-                        dict_inn[item_inn] = dict_inn[item_inn] + 1 if item_inn in dict_inn else count_inn
+            countries = list(self.manager.get_valid_company(item_inn))
+            for country in countries:
+                self.country if country in self.country else self.country.append(country)
+                dict_inn[item_inn] = dict_inn[item_inn] + 1 if item_inn in dict_inn else count_inn
 
     @staticmethod
     def get_code_error(error_code: ElemTree, value: str) -> None:
@@ -413,7 +438,7 @@ class SearchEngineParser(BaseUnifiedCompanies):
             else:
                 raise ConnectionRefusedError(message)
 
-    def parse_xml(self, response: Response, value: str, dict_inn: dict, count_inn: int, unified_companies):
+    def parse_xml(self, response: Response, value: str, dict_inn: dict, count_inn: int):
         """
         Parsing xml.
         """
@@ -427,8 +452,8 @@ class SearchEngineParser(BaseUnifiedCompanies):
             passage = doc.find('.//passage').text or ''
             inn_text: list = re.findall(r"\d+", passage)
             inn_title: list = re.findall(r"\d+", title)
-            self.get_inn_from_site(dict_inn, inn_text, count_inn, unified_companies)
-            self.get_inn_from_site(dict_inn, inn_title, count_inn, unified_companies)
+            self.get_inn_from_site(dict_inn, inn_text, count_inn)
+            self.get_inn_from_site(dict_inn, inn_title, count_inn)
 
     def get_inn_from_search_engine(self, value: str) -> dict:
         """
@@ -444,13 +469,7 @@ class SearchEngineParser(BaseUnifiedCompanies):
         logger.info(f"After request. Data is {value}")
         dict_inn: dict = {}
         count_inn: int = 1
-        unified_companies = [
-            UnifiedRussianCompanies(),
-            UnifiedKazakhstanCompanies(),
-            UnifiedBelarusCompanies(),
-            UnifiedUzbekistanCompanies()
-        ]
-        self.parse_xml(r, value, dict_inn, count_inn, unified_companies)
+        self.parse_xml(r, value, dict_inn, count_inn)
         logger.info(f"Dictionary with INN is {dict_inn}. Data is {value}")
         return dict_inn
 
@@ -460,30 +479,47 @@ class SearchEngineParser(BaseUnifiedCompanies):
         """
         best_found_inn = None
         if number_attempts == 0:
-            return best_found_inn, self.unified_company
+            return best_found_inn, self.country
         unwanted_chars = r"[<>\«\»\’\‘\“\”`'\".,!@#$%^&*()\[\]{};?\|~=_+]+"
         value = re.sub(unwanted_chars, "", value)
         value = re.sub(" +", " ", value).strip()
         rows: sqlite3.Cursor = self.cur.execute(f'SELECT * FROM "{self.table_name}" WHERE taxpayer_id=?', (value,), )
-        if list_rows := list(rows):
+        if (list_rows := list(rows)) and list_rows[0][1]:
             logger.info(f"Data is {list_rows[0][0]}. INN is {list_rows[0][1]}")
-            return list_rows[0][1], list_rows[0][2]
+            return list_rows[0][1]
         try:
             api_inn: dict = self.get_inn_from_search_engine(value)
             best_found_inn = max(api_inn, key=api_inn.get, default=None)
             self.cache_add_and_save(
                 value,
                 best_found_inn,
-                self.unified_company.__str__() if self.unified_company else self.unified_company
+                country=self.country.__str__()
             )
         except ConnectionRefusedError:
             time.sleep(60)
             self.get_company_by_taxpayer_id(value, number_attempts - 1)
-        return best_found_inn, self.unified_company
+        return best_found_inn
 
 
 if __name__ == "__main__":
-    print(UnifiedRussianCompanies().is_valid("192494228"))
-    print(UnifiedKazakhstanCompanies().is_valid("192494228"))
-    print(UnifiedBelarusCompanies().is_valid("192494228"))
-    print(UnifiedUzbekistanCompanies().is_valid("192494228"))
+    import csv
+    rows_ = [
+        """""VELESTORGAGRO"L.T.D ADDRESS: 301, BL."AVTOPRIVAL", 9-KM-MINSK-MOSCOW-6, MINSK REGION,REPUBLIC OFBELARUS + 375 17 368 06 09 +375 17360 64 56"""
+    ]
+    for row_ in rows_:
+        UnifiedContextProcessor.unify_companies({"buyer": row_})
+
+    list_data = []
+    with open('/home/timur/Загрузки/test_all_country (Копия).csv', mode='r') as file:
+        csvFile = csv.DictReader(file)
+        for lines in csvFile:
+            dict_row = {"buyer": lines["company_name"]}
+            UnifiedContextProcessor.unify_companies(dict_row)
+            list_data.append(dict_row)
+    keys = list_data[0].keys()
+    with open("/home/timur/Загрузки/test_all_country2.csv", "w", newline="") as f:
+        dict_writer = csv.DictWriter(f, keys)
+        dict_writer.writeheader()
+        dict_writer.writerows(list_data)
+
+
