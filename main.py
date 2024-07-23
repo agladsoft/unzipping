@@ -388,7 +388,13 @@ class ArchiveExtractor:
             _, ext = os.path.splitext(file_path)
         handler: Callable[[dict], None]
         if handler := self.extension_handlers.get(ext):
-            handler(file_path)
+            try:
+                handler(file_path)
+            except Exception as ex:
+                logger.error(f"Exception is {ex}.")
+                errors: str = os.path.join(self.root_directory, "errors")
+                os.makedirs(errors, exist_ok=True)
+                os.rename(file_path, os.path.join(errors, os.path.basename(file_path)))
         else:
             self.logger.info(f"Найден файл: {file_path}")
 
@@ -397,12 +403,12 @@ class ArchiveExtractor:
         Main function.
         :return:
         """
-        for root, dirs, files in os.walk(self.root_directory):
+        for _, dirs, files in os.walk(self.root_directory):
             for file in files + list(set(dirs) - set(BASE_DIRECTORIES)):
                 self.input_data = file
-                file_path: str = os.path.join(root, file)
+                file_path: str = os.path.join(self.root_directory, file)
                 self.process_archive(file_path)
-                done: str = os.path.join(root, "done")
+                done: str = os.path.join(self.root_directory, "done")
                 os.makedirs(done, exist_ok=True)
                 os.rename(file_path, os.path.join(done, file))
             break
