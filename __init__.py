@@ -19,7 +19,7 @@ DESTINATION_STATION_LABELS: Tuple = (
     "Address/ Адрес/ "
 )
 
-BASE_DIRECTORIES: list = ["errors_excel", "done", "archives", "json", "done_excel"]
+BASE_DIRECTORIES: list = ["errors_excel", "done", "archives", "json", "done_excel", "errors"]
 
 USER_XML_RIVER: str = "6390"
 KEY_XML_RIVER: str = "e3b3ac2908b2a9e729f1671218c85e12cfe643b0"
