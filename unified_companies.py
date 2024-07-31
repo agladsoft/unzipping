@@ -32,12 +32,11 @@ class UnifiedCompaniesManager:
             UnifiedUzbekistanCompanies()
         ]
 
-    def get_valid_company(self, company_data):
-        for unified_company in self.unified_companies:
-            with contextlib.suppress(Exception):
-                if unified_company.is_valid(company_data):
-                    return unified_company
-        return None
+    @staticmethod
+    def get_valid_company(unified_company, company_data):
+        with contextlib.suppress(Exception):
+            if unified_company.is_valid(company_data):
+                return unified_company
 
     @staticmethod
     def fetch_company_name(company, taxpayer_id):
@@ -72,18 +71,20 @@ class UnifiedContextProcessor:
                 context[f"{company}_taxpayer_id"] = taxpayer_id
 
                 if taxpayer_id:
-                    if unified_company := manager.get_valid_company(taxpayer_id):
-                        company_name = manager.fetch_company_name(unified_company, taxpayer_id)
-                        context[f"{company}_unified"] = company_name
+                    for unified_company in manager.unified_companies:
+                        if unified_company := manager.get_valid_company(unified_company, taxpayer_id):
+                            company_name = manager.fetch_company_name(unified_company, taxpayer_id)
+                            context[f"{company}_unified"] = company_name
 
     @staticmethod
     def extract_taxpayer_id(company_data, manager):
         valid_company: Optional[object] = None
         all_digits = re.findall(r"\d+", company_data)
 
-        for item_inn in all_digits:
-            if valid_company := manager.get_valid_company(item_inn):
-                return item_inn
+        for unified_company in manager.unified_companies:
+            for item_inn in all_digits:
+                if valid_company := manager.get_valid_company(unified_company, item_inn):
+                    return item_inn
 
         # If no valid taxpayer ID found, use search engine
         search_engine = SearchEngineParser(valid_company)
