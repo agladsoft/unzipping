@@ -30,11 +30,11 @@ class UnifiedCompaniesManager:
             UnifiedUzbekistanCompanies()
         ]
 
-    def get_valid_company(self, company_data):
-        for unified_company in self.unified_companies:
-            with contextlib.suppress(Exception):
-                if unified_company.is_valid(company_data):
-                    yield unified_company
+    @staticmethod
+    def get_valid_company(unified_company, company_data):
+        with contextlib.suppress(Exception):
+            if unified_company.is_valid(company_data):
+                yield unified_company
 
     @staticmethod
     def fetch_company_name(companies, taxpayer_id):
@@ -72,22 +72,24 @@ class UnifiedContextProcessor:
                 context[f"{company}_taxpayer_id"] = taxpayer_id
 
                 if taxpayer_id:
-                    if unified_company := list(manager.get_valid_company(taxpayer_id)):
-                        company_names = list(manager.fetch_company_name(unified_company, taxpayer_id))
-                        for company_name, phone_number, email in company_names:
-                            if company_name is not None:
-                                context[f"{company}_unified"] = company_name
-                                context["phone_number"] = phone_number
-                                context["email"] = email
+                    for unified_company in manager.unified_companies:
+                        if unified_company := list(manager.get_valid_company(unified_company, taxpayer_id)):
+                            company_names = list(manager.fetch_company_name(unified_company, taxpayer_id))
+                            for company_name, phone_number, email in company_names:
+                                if company_name is not None:
+                                    context[f"{company}_unified"] = company_name
+                                    context["phone_number"] = phone_number
+                                    context["email"] = email
 
     @staticmethod
     def extract_taxpayer_id(company_data, manager):
         valid_company: Optional[object] = []
         all_digits = re.findall(r"\d+", company_data)
 
-        for item_inn in all_digits:
-            if valid_company := list(manager.get_valid_company(item_inn)):
-                return item_inn
+        for unified_company in manager.unified_companies:
+            for item_inn in all_digits:
+                if valid_company := list(manager.get_valid_company(unified_company, item_inn)):
+                    return item_inn
 
         # If no valid taxpayer ID found, use search engine
         search_engine = SearchEngineParser(valid_company, manager)
@@ -416,10 +418,11 @@ class SearchEngineParser(BaseUnifiedCompanies):
         Parse each site (description and title).
         """
         for item_inn in values:
-            countries = list(self.manager.get_valid_company(item_inn))
-            for country in countries:
-                self.country if country in self.country else self.country.append(country)
-                dict_inn[item_inn] = dict_inn[item_inn] + 1 if item_inn in dict_inn else count_inn
+            for unified_company in self.manager.unified_companies:
+                countries = list(self.manager.get_valid_company(unified_company, item_inn))
+                for country in countries:
+                    self.country if country in self.country else self.country.append(country)
+                    dict_inn[item_inn] = dict_inn[item_inn] + 1 if item_inn in dict_inn else count_inn
 
     @staticmethod
     def get_code_error(error_code: ElemTree, value: str) -> None:
