@@ -506,23 +506,16 @@ class SearchEngineParser(BaseUnifiedCompanies):
 
 if __name__ == "__main__":
     import csv
-    rows_ = [
-        """""VELESTORGAGRO"L.T.D ADDRESS: 301, BL."AVTOPRIVAL", 9-KM-MINSK-MOSCOW-6, MINSK REGION,REPUBLIC OFBELARUS + 375 17 368 06 09 +375 17360 64 56"""
-    ]
-    for row_ in rows_:
-        UnifiedContextProcessor.unify_companies({"buyer": row_})
 
-    list_data = []
-    with open('/home/timur/Загрузки/test_all_country (Копия).csv', mode='r') as file:
-        csvFile = csv.DictReader(file)
+    list_data_ = []
+    with open('/home/timur/Загрузки/test_all_country (Копия).csv', mode='r') as file_:
+        csvFile = csv.DictReader(file_)
         for lines in csvFile:
             dict_row = {"buyer": lines["company_name"]}
             UnifiedContextProcessor.unify_companies(dict_row)
-            list_data.append(dict_row)
-    keys = list_data[0].keys()
-    with open("/home/timur/Загрузки/test_all_country2.csv", "w", newline="") as f:
-        dict_writer = csv.DictWriter(f, keys)
+            list_data_.append(dict_row)
+    keys_ = list_data_[0].keys()
+    with open("/home/timur/Загрузки/test_all_country2.csv", "w", newline="") as f_:
+        dict_writer = csv.DictWriter(f_, keys_)
         dict_writer.writeheader()
-        dict_writer.writerows(list_data)
-
-
+        dict_writer.writerows(list_data_)
