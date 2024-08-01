@@ -13,6 +13,7 @@ DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
 # os.environ["XL_IDP_PATH_UNZIPPING"] = "/home/timur/sambashare/unzipping"
 
 COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
+LEN_COLUMNS_IN_ROW: int = 5
 
 DESTINATION_STATION_LABELS: Tuple = (
     "Address/ Адрес/ 地址",

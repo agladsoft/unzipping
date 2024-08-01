@@ -98,7 +98,7 @@ class DataExtractor:
             list_columns.extend(iter(keys))
         return list_columns
 
-    def _get_probability_of_header(self, row: list, list_columns: list) -> int:
+    def _get_probability_of_header(self, row: list, list_columns: list) -> Tuple[int, int]:
         """
         Getting the probability of a row as a header.
         """
@@ -107,7 +107,7 @@ class DataExtractor:
         probability_of_header: int = int(count / len(row) * 100)
         if probability_of_header != 0 and probability_of_header < COEFFICIENT_OF_HEADER_PROBABILITY:
             self.logger.error(f"Probability of header is {probability_of_header}. Columns is {row}")
-        return probability_of_header
+        return len(row), probability_of_header
 
     def copy_file_to_dir(self, dir_name):
         """
@@ -258,7 +258,8 @@ class DataExtractor:
         for _, rows in df.iterrows():
             rows = list(rows.to_dict().values())
             try:
-                if self._get_probability_of_header(rows, self._get_list_columns()) >= COEFFICIENT_OF_HEADER_PROBABILITY:
+                len_rows, coefficient = self._get_probability_of_header(rows, self._get_list_columns())
+                if coefficient >= COEFFICIENT_OF_HEADER_PROBABILITY and len_rows >= LEN_COLUMNS_IN_ROW:
                     if not self.is_all_right_columns(context):
                         return
                     # self.unified_values(context)
