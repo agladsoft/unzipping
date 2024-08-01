@@ -60,10 +60,13 @@ class DataExtractor:
         """
         Understanding when a headerless table starts.
         """
+        number_pp_index: Optional[int] = self.dict_columns_position.get("number_pp")
+
         return (
                 self.dict_columns_position["model"] or
                 self.dict_columns_position["country_of_origin"] or
-                self._is_digit(row[self.dict_columns_position.get("number_pp")])
+                (number_pp_index is not None and self._is_digit(row[number_pp_index])) or
+                self.dict_columns_position["goods_description"]
         ) and row[self.dict_columns_position["tnved_code"]] \
             and any(char.isdigit() for char in row[self.dict_columns_position["tnved_code"]])
 
@@ -263,8 +266,13 @@ class DataExtractor:
                     self._get_columns_position(rows)
                 elif self._is_table_starting(rows):
                     self._get_content_in_table(rows, list_data, context)
-            except TypeError:
-                count_address = self._get_content_before_table(rows, context, count_address)
+                else:
+                    count_address = self._get_content_before_table(rows, context, count_address)
+            except Exception as ex:
+                self.logger.error(f"Ошибка при обработке файла {self.filename}: {ex}. "
+                                  f"Предположительно нету ключа tnved_code")
+                self.copy_file_to_dir("errors_excel")
+                break
         return list_data
 
     def read_excel_file(self):
