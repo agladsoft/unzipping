@@ -34,9 +34,14 @@ class UnifiedCompaniesManager:
 
     @staticmethod
     def get_valid_company(unified_company, company_data):
-        with contextlib.suppress(Exception):
-            if unified_company.is_valid(company_data):
-                return unified_company
+        return next(
+            (
+                (unified_company, taxpayer_id)
+                for taxpayer_id in company_data
+                if unified_company.is_valid(taxpayer_id)
+            ),
+            (None, None),
+        )
 
     @staticmethod
     def fetch_company_name(company, taxpayer_id):
@@ -67,14 +72,18 @@ class UnifiedContextProcessor:
 
         for company in HEADER_LABELS[:4]:
             if company_data := context.get(company):
-                taxpayer_id = UnifiedContextProcessor.extract_taxpayer_id(company_data, manager)
-                context[f"{company}_taxpayer_id"] = taxpayer_id
-
-                if taxpayer_id:
+                if taxpayer_ids := list(
+                        filter(
+                            lambda x: x is not None,
+                            UnifiedContextProcessor.extract_taxpayer_id(company_data, manager)
+                        )
+                ):
                     for unified_company in manager.unified_companies:
-                        if unified_company := manager.get_valid_company(unified_company, taxpayer_id):
-                            company_name = manager.fetch_company_name(unified_company, taxpayer_id)
-                            context[f"{company}_unified"] = company_name
+                        unified_company, taxpayer_id = manager.get_valid_company(unified_company, taxpayer_ids)
+                        if unified_company:
+                            if company_name := manager.fetch_company_name(unified_company, taxpayer_id):
+                                context[f"{company}_taxpayer_id"] = taxpayer_id
+                                context[f"{company}_unified"] = company_name
 
     @staticmethod
     def extract_taxpayer_id(company_data, manager):
@@ -82,13 +91,13 @@ class UnifiedContextProcessor:
         all_digits = re.findall(r"\d+", company_data)
 
         for unified_company in manager.unified_companies:
-            for item_inn in all_digits:
-                if valid_company := manager.get_valid_company(unified_company, item_inn):
-                    return item_inn
+            valid_company, item_inn = manager.get_valid_company(unified_company, all_digits)
+            if valid_company:
+                yield item_inn
 
         # If no valid taxpayer ID found, use search engine
         search_engine = SearchEngineParser(valid_company)
-        return search_engine.get_company_by_taxpayer_id(company_data, 3)[0]
+        yield search_engine.get_company_by_taxpayer_id(company_data, 3)[0]
 
 
 class BaseUnifiedCompanies(abc.ABC):
