@@ -17,7 +17,7 @@ LEN_COLUMNS_IN_ROW: int = 5
 
 DESTINATION_STATION_LABELS: Tuple = (
     "Address/ Адрес/ 地址",
-    "Address/ Адрес/ "
+    "Address/ Адрес/"
 )
 
 BASE_DIRECTORIES: list = ["errors_excel", "done", "archives", "json", "done_excel", "errors"]

@@ -177,7 +177,7 @@ class DataExtractor:
         :param rows:
         :return:
         """
-        if row in DESTINATION_STATION_LABELS and not context.get(row):
+        if row.strip() in DESTINATION_STATION_LABELS and not context.get(row):
             count_address += 1
             if count_address == 2:
                 for cell in rows[i:]:
@@ -186,6 +186,18 @@ class DataExtractor:
                     cell = self._remove_many_spaces(cell, is_remove_spaces=False)
                     context["destination_station"] = context[row] if context.get(row) else cell
         return count_address
+
+    def merge_sells(self, count_address, context, i, row, rows):
+        if row.strip() in DESTINATION_STATION_LABELS:
+            columns = list(DICT_LABELS.keys())
+            col_map = {1: 0, 3: 1, 4: 3}  # Сопоставление count_address с индексом колонки
+
+            for cell in rows[i:]:
+                if cell and cell.strip():
+                    cell = self._remove_many_spaces(cell, is_remove_spaces=False)
+                    if count_address in col_map:
+                        context[columns[col_map[count_address]]] += f" {cell}"
+                    break
 
     def _get_content_before_table(self, rows: list, context: dict, count_address: int) -> int:
         """
@@ -198,6 +210,7 @@ class DataExtractor:
             if not row:
                 continue
             count_address = self._get_address_same_keys(context, i, count_address, row, rows)
+            self.merge_sells(count_address, context, i, row, rows)
             splitter_column = row.split(":")
             column = self._remove_spaces_and_symbols(row)
             for uni_columns, columns in DICT_LABELS.items():
@@ -213,14 +226,6 @@ class DataExtractor:
                 elif self._remove_spaces_and_symbols(splitter_column[0]) in columns:
                     context[uni_columns] = splitter_column[-1].strip()
         return count_address
-
-    @staticmethod
-    def unified_values(context: dict):
-        for value in DICT_STATION['station']:
-            if value and value in context['destination_station'].upper():
-                index: int = DICT_STATION['station'].index(value)
-                context['destination_station'] = DICT_STATION['station_unified'][index]
-                break
 
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
         """
@@ -262,8 +267,7 @@ class DataExtractor:
                 if coefficient >= COEFFICIENT_OF_HEADER_PROBABILITY and len_rows >= LEN_COLUMNS_IN_ROW:
                     if not self.is_all_right_columns(context):
                         return
-                    # self.unified_values(context)
-                    UnifiedContextProcessor.unified_values(context)
+                    UnifiedContextProcessor.unified_values(context, df)
                     self._get_columns_position(rows)
                 elif self._is_table_starting(rows):
                     self._get_content_in_table(rows, list_data, context)

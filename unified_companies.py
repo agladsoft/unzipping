@@ -8,6 +8,7 @@ import contextlib
 from __init__ import *
 from pathlib import Path
 from functools import reduce
+from pandas import DataFrame
 from datetime import datetime
 from bs4 import BeautifulSoup
 from operator import add, mul
@@ -39,19 +40,19 @@ class UnifiedCompaniesManager:
                 return unified_company
 
     @staticmethod
-    def fetch_company_name(company, taxpayer_id):
+    def fetch_company_name(df, company, taxpayer_id):
         rows = company.cur.execute(
             f'SELECT * FROM "{company.table_name}" WHERE taxpayer_id=?',
             (taxpayer_id,)
         ).fetchall()
-        return rows[0][1] if rows else company.get_company_by_taxpayer_id(taxpayer_id, 3)
+        return rows[0][1] if rows else company.get_company_by_taxpayer_id(df, taxpayer_id, 3)
 
 
 class UnifiedContextProcessor:
     @staticmethod
-    def unified_values(context: dict):
+    def unified_values(context: dict, df: DataFrame):
         UnifiedContextProcessor.unify_station(context)
-        UnifiedContextProcessor.unify_companies(context)
+        UnifiedContextProcessor.unify_companies(context, df)
 
     @staticmethod
     def unify_station(context: dict):
@@ -62,22 +63,24 @@ class UnifiedContextProcessor:
                 break
 
     @staticmethod
-    def unify_companies(context: dict):
+    def unify_companies(context: dict, df: DataFrame):
         manager = UnifiedCompaniesManager()
 
         for company in HEADER_LABELS[:4]:
             if company_data := context.get(company):
-                taxpayer_id = UnifiedContextProcessor.extract_taxpayer_id(company_data)
+                taxpayer_id, country, is_found_taxpayer_id = \
+                    UnifiedContextProcessor.extract_taxpayer_id(company_data, df)
                 context[f"{company}_taxpayer_id"] = taxpayer_id
+                context[f"is_found_{company}_taxpayer_id_invoice"] = is_found_taxpayer_id
 
                 if taxpayer_id:
                     for unified_company in manager.unified_companies:
                         if unified_company := manager.get_valid_company(unified_company, taxpayer_id):
-                            company_name = manager.fetch_company_name(unified_company, taxpayer_id)
+                            company_name = manager.fetch_company_name(df, unified_company, taxpayer_id)
                             context[f"{company}_unified"] = company_name
 
     @staticmethod
-    def extract_taxpayer_id(company_data):
+    def extract_taxpayer_id(company_data, df: DataFrame):
         valid_company: Optional[object] = None
         # all_digits = re.findall(r"\d+", company_data)
         #
@@ -88,7 +91,7 @@ class UnifiedContextProcessor:
 
         # If no valid taxpayer ID found, use search engine
         search_engine = SearchEngineParser(valid_company)
-        return search_engine.get_company_by_taxpayer_id(company_data, 3)[0]
+        return search_engine.get_company_by_taxpayer_id(df, company_data, 3)
 
 
 class BaseUnifiedCompanies(abc.ABC):
@@ -102,7 +105,7 @@ class BaseUnifiedCompanies(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int) -> Optional[str]:
+    def get_company_by_taxpayer_id(self, df: DataFrame, taxpayer_id: str, number_attempts: int) -> Optional[str]:
         pass
 
     @staticmethod
@@ -219,10 +222,11 @@ class UnifiedRussianCompanies(BaseUnifiedCompanies):
         except ValidationError:
             return False
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int) -> Optional[str]:
+    def get_company_by_taxpayer_id(self, df: DataFrame, taxpayer_id: str, number_attempts: int) -> Optional[str]:
         """
         Getting the company name unified from the cache, if there is one.
         Otherwise, we are looking for verification of legal entities on websites.
+        :param df:
         :param taxpayer_id:
         :param number_attempts:
         :return:
@@ -271,9 +275,10 @@ class UnifiedKazakhstanCompanies(BaseUnifiedCompanies):
             check_sum = self.multiply(w2, number) % 11
         return check_sum == int(number[-1])
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
+    def get_company_by_taxpayer_id(self, df: DataFrame, taxpayer_id: str, number_attempts: int):
         """
-        
+
+        :param df:
         :param taxpayer_id:
         :param number_attempts:
         :return:
@@ -323,9 +328,10 @@ class UnifiedBelarusCompanies(BaseUnifiedCompanies):
 
         return checksum == int(number[-1])
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
+    def get_company_by_taxpayer_id(self, df: DataFrame, taxpayer_id: str, number_attempts: int):
         """
-        
+
+        :param df:
         :param taxpayer_id:
         :param number_attempts:
         :return:
@@ -352,9 +358,10 @@ class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
     def is_valid(self, number):
         return False if len(number) != 9 else bool(re.match(r'[3-8]', number))
 
-    def get_company_by_taxpayer_id(self, taxpayer_id: str, number_attempts: int):
+    def get_company_by_taxpayer_id(self, df: DataFrame, taxpayer_id: str, number_attempts: int):
         """
 
+        :param df:
         :param taxpayer_id:
         :param number_attempts:
         :return:
@@ -455,11 +462,34 @@ class SearchEngineParser(BaseUnifiedCompanies):
         logger.info(f"Dictionary with INN is {dict_inn}. Data is {value}")
         return dict_inn
 
-    def get_company_by_taxpayer_id(self, value: str, number_attempts: int):
+    @staticmethod
+    def find_key_in_dataframe(df: DataFrame, search_dict: dict):
+        """
+        Define the function to search for a string in the DataFrame
+        :param df:
+        :param search_dict:
+        :return:
+        """
+        def search_string(s, search):
+            return search in str(s).lower()
+
+        for key in search_dict:
+            # Create a mask by applying the search function to check if the key exists
+            mask = df.apply(lambda x: x.map(lambda s: search_string(s, key)))
+
+            # If any value in the mask is True, return the key
+            if mask.any().any():
+                return key
+
+        # If no key is found, return None
+        return None
+
+    def get_company_by_taxpayer_id(self, df: DataFrame, value: str, number_attempts: int):
         """
         Getting the INN from the cache, if there is one. Otherwise, we search in the search engine.
         """
         best_found_inn = None
+        is_found_taxpayer_id_invoice = True
         if number_attempts == 0:
             return best_found_inn, self.unified_company
         unwanted_chars = r"[<>\«\»\’\‘\“\”`'\".,!@#$%^&*()\[\]{};?\|~=_+]+"
@@ -468,10 +498,15 @@ class SearchEngineParser(BaseUnifiedCompanies):
         rows: sqlite3.Cursor = self.cur.execute(f'SELECT * FROM "{self.table_name}" WHERE taxpayer_id=?', (value,), )
         if list_rows := list(rows):
             logger.info(f"Data is {list_rows[0][0]}. INN is {list_rows[0][1]}")
-            return list_rows[0][1], list_rows[0][2]
+            if not self.find_key_in_dataframe(df, {f"{list_rows[0][1]}": 1}):
+                is_found_taxpayer_id_invoice = False
+            return list_rows[0][1], list_rows[0][2], is_found_taxpayer_id_invoice
         try:
             api_inn: dict = self.get_inn_from_search_engine(value)
-            best_found_inn = max(api_inn, key=api_inn.get, default=None)
+            best_found_inn = self.find_key_in_dataframe(df, api_inn)
+            if not best_found_inn:
+                is_found_taxpayer_id_invoice = False
+                best_found_inn = max(api_inn, key=api_inn.get, default=None)
             self.cache_add_and_save(
                 value,
                 best_found_inn,
@@ -479,8 +514,8 @@ class SearchEngineParser(BaseUnifiedCompanies):
             )
         except ConnectionRefusedError:
             time.sleep(60)
-            self.get_company_by_taxpayer_id(value, number_attempts - 1)
-        return best_found_inn, self.unified_company
+            self.get_company_by_taxpayer_id(df, value, number_attempts - 1)
+        return best_found_inn, self.unified_company, is_found_taxpayer_id_invoice
 
 
 if __name__ == "__main__":
