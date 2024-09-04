@@ -1,135 +1,55 @@
 import os
 import logging
-from typing import Dict, Tuple
+import numpy as np
+import pandas as pd
+from typing import Tuple
+from itertools import cycle
 from logging.handlers import RotatingFileHandler
 
 LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
 DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
 
-os.environ['XL_IDP_PATH_UNZIPPING'] = '.'
+# os.environ["XL_IDP_ROOT_UNZIPPING"] = "."
+# os.environ["XL_IDP_PATH_UNZIPPING"] = "/home/timur/sambashare/unzipping"
 
 COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
+LEN_COLUMNS_IN_ROW: int = 5
 
-DICT_LABELS: dict = {
-    (
-        "Отправитель",
-        "Отправитель / Продавец",
-        "Shipper/Seller",
-        "Seller/Продавец/ 卖家",
-        "Продавец/Отправитель",
-        "Продавец/Seller",
-        "Продавец\nSeller",
-        "Seller/Продавец/",
-        "Seller / Продавец",
-        "Shipper / Seller"
-    ):
-        "sender",
-    (
-        "Покупатель",
-        "Buyer",
-        "Buyer / Покупатель/ 买主",
-        "покупатель/Buyer",
-        "Покупатель\nBuyer",
-        "Buyer / Покупатель/",
-        "Buyer / Покупатель",
-        "Buyer /"
-    ):
-        "recipient",
-    ("Станция назначения",): "destination_station",
-    ("Станция отправления",): "departure_station",
+DESTINATION_STATION_LABELS: Tuple = (
+    "Address/ Адрес/ 地址",
+    "Address/ Адрес/"
+)
+
+BASE_DIRECTORIES: list = ["errors_excel", "done", "archives", "json", "done_excel", "errors"]
+
+USER_XML_RIVER: str = "6390"
+KEY_XML_RIVER: str = "e3b3ac2908b2a9e729f1671218c85e12cfe643b0"
+
+DADATA_TOKEN: str = "3321a7103852f488c92dbbd926b2e554ad63fb49"
+DADATA_SECRET: str = "3c905f3b5b6291c65d323e3b774e7b8f6d1b7919"
+
+MESSAGE_TEMPLATE: dict = {
+    '200': "The money ran out. Index is {}. Exception - {}. Value - {}",
+    '110': "There are no free channels for data collection. Index is {}. Exception - {}. Value - {}",
+    '111': "There are no free channels for data collection. Index is {}. Exception - {}. Value - {}",
+    '15': "No results found in the search engine. Index is {}. Exception - {}. Value - {}"
 }
 
-DICT_HEADERS_COLUMN_ENG: Dict[Tuple, str] = {
-    (
-        "Модель",
-    ):
-        "model",
-    (
-        "No.",
-        "No.编号",
-        "Pll",
-        "№ п/п"
-    ):
-        "number_pp",
-    (
-        "HS Code / Код ТН ВЭД ТС",
-        "Код ТН ВЭД ТС ЕАЭС",
-        "HS Code /海关编码/ Код ТН ВЭД ТС ЕАЭС",
-        "HS Code /海关编码 / Код ТН ВЭД ТС ЕАЭС",
-        "HS code RUSSIA КОД ТНВЭД РОССИЯ",
-        "HS Code /",
-        "HS Code /Код ТН ВЭД ТС",
-        "HS code/Код ТНВЭД",
-        "Код ТН ВЭД"
-    ):
-        "tnved_code",
-    (
-        "Страна происхождения товара",
-        "Country of origin/ Страна происхождения товара/ 商品原产国",
-        "Страна происхождения товара货源国",
-        "Country of origin / Страна происхождения товара"
-    ):
-        "country_of_origin",
-    (
-        "Описание товара",
-        "Описание товаров/description of goods",
-        "Description of goods/ Описание товаров/货物名称",
-        "Description of goods",
-        "Описание товаров/description of goods货物名，描述",
-        "Description of goods /Описание товаров",
-    ):
-        "goods_description",
-    (
-        "Qty pcs / Кол-во шт",
-        "Qty pcs / Кол-во шт/ 单件数量",
-        "Qty pcs / Кол-во шт单件数",
-        "Кол-во, шт"
-    ):
-        "quantity",
-    (
-        "Qty of packages/Кол-во мест, коробов",
-        "Qty of packages/ Кол-во мест/ 包装数量",
-        "Qty of packages/Кол-во мест, коробов件数",
-        "Qty places, boxes /Кол-во мест, коробок",
-        "Quantity (meters) /Кол-во (метры)",
-        "Кол-во, мест"
-    ):
-        "package_quantity",
-    (
-        "Net weight kg / Вес нетто кг",
-        "Net weight kg / Вес нетто кг/ 净重",
-        "Net weight kg / Вес нетто кг净重",
-        "Net weight, kg / Вес нетто, кг",
-        "NETT weight, KG",
-        "Вес НЕТТО,кг"
-    ):
-        "net_weight",
-    (
-        "Gross weight kg / Вес брутто кг",
-        "Gross weight kg / Вес брутто кг / 毛重",
-        "Gross weight kg / Вес брутто кг毛重",
-        "Gross weight, kg /Вес брутто, кг",
-        "GROSS weight, KG",
-        "Вес БРУТТО,кг"
-    ):
-        "gross_weight",
-    (
-        "Price per pcs / Цена за шт, CNY",
-        "Price per one peace/Цена за шт/ 单件价格",
-        "Price per 1 pcs / Цена за 1 шт, USD单价",
-        "Price per pcs /Цена за шт, CNY",
-        "Price for unit, Chinese yuan / Цена за единицу, китайские юани"
-    ):
-        "price_per_piece",
-    (
-        "Amount / Общая стоимость, CNY",
-        "Amount / Общая стоимость/ 总货值",
-        "Amount / Общая стоимость, USD总价",
-        "Amount /Общая стоимость, CNY",
-        "The Ammount Of Chinese yuan / Сумма китайские юани"
-    ):
-        "total_cost"
+PREFIX_TEMPLATE: dict = {
+    '200': "закончились_деньги_на_строке_",
+    '110': "нет_свободных_каналов_на_строке_",
+    '111': "нет_свободных_каналов_на_строке_",
+    '15': "не_найдено_результатов_"
 }
+
+PROXIES: list = [
+    'http://user139922:oulrqa@181.215.227.151:1866',
+    'http://user139922:oulrqa@181.215.227.145:1866',
+    'http://user139922:oulrqa@181.215.227.225:1866',
+    'http://user139922:oulrqa@181.215.227.93:1866',
+    'http://user139922:oulrqa@181.215.227.198:1866'
+]
+CYCLED_PROXIES: cycle = cycle(PROXIES)
 
 
 def get_my_env_var(var_name: str) -> str:
@@ -140,10 +60,10 @@ def get_my_env_var(var_name: str) -> str:
 
 
 def get_file_handler(name: str) -> logging.FileHandler:
-    log_dir_name: str = f"{get_my_env_var('XL_IDP_PATH_UNZIPPING')}/logging"
+    log_dir_name: str = f"{get_my_env_var('XL_IDP_ROOT_UNZIPPING')}/logging"
     if not os.path.exists(log_dir_name):
         os.mkdir(log_dir_name)
-    file_handler = RotatingFileHandler(filename=f"{log_dir_name}/{name}.log", mode='a', maxBytes=1.5 * pow(1024, 2),
+    file_handler = RotatingFileHandler(filename=f"{log_dir_name}/{name}.log", mode='a', maxBytes=10.5 * pow(1024, 2),
                                        backupCount=3)
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FTM))
     return file_handler
@@ -166,5 +86,25 @@ def get_logger(name: str) -> logging.getLogger:
     return logger
 
 
+def read_config_table(sheet):
+    df = pd.read_excel(
+        f"{get_my_env_var('XL_IDP_ROOT_UNZIPPING')}/unzipping_table.xlsx",
+        dtype=str,
+        sheet_name=sheet
+    )
+    df.replace({np.nan: None, "NaT": None}, inplace=True)
+    headers = list(df.columns)
+    return {
+        header: list(df.iloc[:, i].dropna().tolist())
+        for i, header in enumerate(headers)
+    }
+
+
 class MissingEnvironmentVariable(Exception):
     pass
+
+
+DICT_LABELS: dict = read_config_table("labels_before_table")
+HEADER_LABELS: list = list(DICT_LABELS)[:6]
+DICT_HEADERS_COLUMN_ENG: dict = read_config_table("headers_table")
+DICT_STATION: dict = read_config_table("station")
