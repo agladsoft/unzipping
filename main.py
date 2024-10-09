@@ -411,6 +411,19 @@ class ArchiveExtractor:
         else:
             self.logger.info(f"Найден файл: {file_path}")
 
+    @staticmethod
+    def is_file_fully_loaded(file_path, wait_time=5):
+        """
+        Check if a file is fully loaded by comparing its size over time.
+        :param file_path: Path to the file to check
+        :param wait_time: Time to wait between size checks (in seconds)
+        :return: True if the file is fully loaded, False otherwise
+        """
+        initial_size = os.path.getsize(file_path)
+        time.sleep(wait_time)
+        final_size = os.path.getsize(file_path)
+        return initial_size == final_size
+
     def main(self):
         """
         Main function.
@@ -418,12 +431,15 @@ class ArchiveExtractor:
         """
         for _, dirs, files in os.walk(self.root_directory):
             for file in files + list(set(dirs) - set(BASE_DIRECTORIES)):
-                self.input_data = file
                 file_path: str = os.path.join(self.root_directory, file)
-                self.process_archive(file_path)
-                done: str = os.path.join(self.root_directory, "done")
-                os.makedirs(done, exist_ok=True)
-                os.rename(file_path, os.path.join(done, file))
+
+                # Check if the file is fully loaded
+                if self.is_file_fully_loaded(file_path):
+                    self.input_data = file
+                    self.process_archive(file_path)
+                    done: str = os.path.join(self.root_directory, "done")
+                    os.makedirs(done, exist_ok=True)
+                    os.rename(file_path, os.path.join(done, file))
             break
 
 
