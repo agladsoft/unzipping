@@ -412,7 +412,7 @@ class ArchiveExtractor:
             self.logger.info(f"Найден файл: {file_path}")
 
     @staticmethod
-    def is_file_fully_loaded(file_path, wait_time=5):
+    def is_file_fully_loaded(file_path, wait_time=360):
         """
         Check if a file is fully loaded by comparing its size over time.
         :param file_path: Path to the file to check
