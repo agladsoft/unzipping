@@ -224,7 +224,7 @@ class DataExtractor:
                         context.setdefault(uni_columns, cell)
                     break
                 elif self._remove_spaces_and_symbols(splitter_column[0]) in columns:
-                    context[uni_columns] = " ".join(splitter_column[1:]).strip()
+                    context[uni_columns] = " ".join(splitter_column[1:]).strip() or splitter_column[-1].strip()
         return count_address
 
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
