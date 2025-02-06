@@ -137,11 +137,24 @@ class DataExtractor:
         """
         self.logger.info(f"Данные записываются в файл json. Файл -{self.filename}")
         basename = os.path.basename(self.filename)
-        dir_name = os.path.join(self.directory, 'json')
+        self._extracted_from_write_to_json(
+            'json', basename, list_data
+        )
+        for data in list_data:
+            data["is_duplicated"] = True
+        self._extracted_from_write_to_json(
+            'json_test', basename, list_data
+        )
+
+    def _extracted_from_write_to_json(self, dir_name, basename, list_data):
+        dir_name = os.path.join(self.directory, dir_name)
         os.makedirs(dir_name, exist_ok=True)
-        output_file_path = os.path.join(dir_name, f'{basename}.json')
-        with open(output_file_path, 'w', encoding='utf-8') as f:
+
+        result = os.path.join(dir_name, f'{basename}.json')
+        with open(result, 'w', encoding='utf-8') as f:
             json.dump(list_data, f, ensure_ascii=False, indent=4, cls=JsonEncoder)
+
+        return result
 
     def _get_columns_position(self, rows: list) -> None:
         """
