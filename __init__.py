@@ -21,7 +21,7 @@ DESTINATION_STATION_LABELS: Tuple = (
     "Address/ Адрес/"
 )
 
-BASE_DIRECTORIES: list = ["errors_excel", "done", "archives", "json", "json_test", "done_excel", "errors"]
+BASE_DIRECTORIES: list = ["errors_excel", "done", "archives", "json", "done_excel", "errors"]
 
 USER_XML_RIVER: str = "6390"
 KEY_XML_RIVER: str = "e3b3ac2908b2a9e729f1671218c85e12cfe643b0"
@@ -44,11 +44,16 @@ PREFIX_TEMPLATE: dict = {
 }
 
 PROXIES: list = [
-    'http://user139922:oulrqa@181.215.227.151:1866',
-    'http://user139922:oulrqa@181.215.227.145:1866',
-    'http://user139922:oulrqa@181.215.227.225:1866',
-    'http://user139922:oulrqa@181.215.227.93:1866',
-    'http://user139922:oulrqa@181.215.227.198:1866'
+    'http://user139922:oulrqa@77.83.194.180:2337',
+    'http://user139922:oulrqa@102.165.10.213:2337',
+    'http://user139922:oulrqa@77.83.194.99:2337',
+    'http://user139922:oulrqa@77.83.194.41:2337',
+    'http://user139922:oulrqa@45.87.254.209:2337',
+    'http://user139922:oulrqa@102.165.10.243:2337',
+    'http://user139922:oulrqa@45.87.254.20:2337',
+    'http://user139922:oulrqa@102.165.10.249:2337',
+    'http://user139922:oulrqa@102.165.10.154:2337',
+    'http://user139922:oulrqa@102.165.10.58:2337'
 ]
 CYCLED_PROXIES: cycle = cycle(PROXIES)
 
