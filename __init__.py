@@ -8,9 +8,10 @@ from logging.handlers import RotatingFileHandler
 
 LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
 DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
+WAITING_TIME: int = 300
 
 # os.environ["XL_IDP_ROOT_UNZIPPING"] = "."
-# os.environ["XL_IDP_PATH_UNZIPPING"] = "/home/timur/sambashare/unzipping"
+# os.environ["XL_IDP_PATH_UNZIPPING"] = "/home/timur/sambashare/unzipping/upload"
 
 COEFFICIENT_OF_HEADER_PROBABILITY: int = 20
 LEN_COLUMNS_IN_ROW: int = 5
@@ -63,8 +64,10 @@ def get_file_handler(name: str) -> logging.FileHandler:
     log_dir_name: str = f"{get_my_env_var('XL_IDP_ROOT_UNZIPPING')}/logging"
     if not os.path.exists(log_dir_name):
         os.mkdir(log_dir_name)
-    file_handler = RotatingFileHandler(filename=f"{log_dir_name}/{name}.log", mode='a', maxBytes=10.5 * pow(1024, 2),
-                                       backupCount=3)
+    file_handler: RotatingFileHandler = RotatingFileHandler(
+        filename=f"{log_dir_name}/{name}.log", mode='a', maxBytes=10.5 * pow(1024, 2),
+        backupCount=3
+    )
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FTM))
     return file_handler
 
