@@ -63,10 +63,10 @@ class DataExtractor:
         number_pp_index: Optional[int] = self.dict_columns_position.get("number_pp")
 
         return (
-                self.dict_columns_position["model"] or
-                self.dict_columns_position["country_of_origin"] or
-                (number_pp_index is not None and self._is_digit(row[number_pp_index])) or
-                self.dict_columns_position["goods_description"]
+            self.dict_columns_position["model"] or
+            self.dict_columns_position["country_of_origin"] or
+            (number_pp_index is not None and self._is_digit(row[number_pp_index])) or
+            self.dict_columns_position["goods_description"]
         ) and row[self.dict_columns_position["tnved_code"]] \
             and any(char.isdigit() for char in row[self.dict_columns_position["tnved_code"]])
 
@@ -402,7 +402,7 @@ class ArchiveExtractor:
             inner_archive_file.close()
             return inner_archive_filename
         except Exception as ex:
-            self.logger.error(f"Ошибка при сохранении файла {file_info.filename}: {ex}. Path is {self.dir_name}")
+            self.logger.error(f"Ошибка при извлечении файла {file_info.filename}: {ex}")
 
     def into_dirs(self, dir_name: str) -> None:
         """
@@ -448,6 +448,7 @@ class ArchiveExtractor:
             _, ext = file_path, ''
         else:
             _, ext = os.path.splitext(file_path)
+        ext: str = ext.lower()
         handler: Callable[[str], None]
         if handler := self.extension_handlers.get(ext):
             try:
