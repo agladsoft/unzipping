@@ -1,4 +1,5 @@
 import json
+import py7zr
 import shutil
 import zipfile
 import rarfile
@@ -109,13 +110,39 @@ class DataExtractor:
             self.logger.error(f"Probability of header is {probability_of_header}. Columns is {row}")
         return len(row), probability_of_header
 
+    @staticmethod
+    def get_unique_filename(target_dir: str, base_name: str) -> str:
+        """
+        Checks the existence of the file and adds a suffix (_1, _2, etc.) if it already exists.
+        :param target_dir: Target directory.
+        :param base_name: The original file name.
+        :return: Unique file name.
+        """
+        dest_path: str = os.path.join(target_dir, base_name)
+
+        if os.path.exists(dest_path):
+            base, ext = os.path.splitext(base_name)
+            counter = 1
+            while os.path.exists(os.path.join(target_dir, f"{base}_{counter}{ext}")):
+                counter += 1
+            dest_path = os.path.join(target_dir, f"{base}_{counter}{ext}")
+
+        return dest_path
+
     def copy_file_to_dir(self, dir_name: str) -> None:
         """
-
+        Copies the file to the specified directory, preventing overwriting, if a file with the same name already exists.
+        :param dir_name:
         :return:
         """
-        os.makedirs(os.path.join(self.directory, dir_name), exist_ok=True)
-        os.popen(f"cp '{self.filename}' '{os.path.join(self.directory, dir_name)}'")
+        target_dir: str = os.path.join(self.directory, dir_name)
+        os.makedirs(target_dir, exist_ok=True)
+
+        base_name: str = os.path.basename(self.filename)
+        unique_path: str = self.get_unique_filename(target_dir, base_name)
+
+        shutil.copy(self.filename, unique_path)
+        self.logger.info(f"Файл скопирован в {unique_path}")
 
     def write_to_file(self, list_data: list) -> None:
         """
@@ -135,13 +162,18 @@ class DataExtractor:
         :param list_data:
         :return:
         """
-        self.logger.info(f"Данные записываются в файл json. Файл -{self.filename}")
-        basename = os.path.basename(self.filename)
-        dir_name = os.path.join(self.directory, 'json')
+        self.logger.info(f"Данные записываются в файл json. Файл - {self.filename}")
+
+        dir_name: str = os.path.join(self.directory, 'json')
         os.makedirs(dir_name, exist_ok=True)
-        output_file_path = os.path.join(dir_name, f'{basename}.json')
+
+        base_name: str = f"{os.path.basename(self.filename)}.json"
+        output_file_path: str = self.get_unique_filename(dir_name, base_name)
+
         with open(output_file_path, 'w', encoding='utf-8') as f:
             json.dump(list_data, f, ensure_ascii=False, indent=4, cls=JsonEncoder)
+
+        self.logger.info(f"Файл сохранён как {output_file_path}")
 
     def _get_columns_position(self, rows: list) -> None:
         """
@@ -319,8 +351,9 @@ class DataExtractor:
                 else:
                     count_address = self._get_content_before_table(rows, context, count_address)
             except Exception as ex:
-                self.logger.error(f"Ошибка при обработке файла {self.filename}: {ex}. "
-                                  f"Предположительно нету ключа tnved_code")
+                self.logger.error(
+                    f"Ошибка при обработке файла {self.filename}: {ex}. Предположительно нету ключа tnved_code"
+                )
                 self.copy_file_to_dir("errors_excel")
                 break
         return list_data
@@ -358,6 +391,7 @@ class ArchiveExtractor:
             '.xls': self.read_excel_file,
             '.zip': self.unzip_archive,
             '.rar': self.unrar_archive,
+            '.7z': self.seven_zip_archive,
             '': self.into_dirs
         }
 
@@ -413,6 +447,25 @@ class ArchiveExtractor:
         for item in os.listdir(dir_name):
             item_path = os.path.join(dir_name, item)
             self.process_archive(item_path)
+
+    def seven_zip_archive(self, seven_zip_file: str) -> None:
+        """
+        Extract and process a 7z archive.
+        :param seven_zip_file: Path to the 7z archive file.
+        :return:
+        """
+        self.logger.info(f"Найден архив: {seven_zip_file}")
+        file_list: list = py7zr.SevenZipFile(seven_zip_file, 'r').getnames()  # Получаем список файлов
+        for file_name in file_list:
+            extract_path: str = os.path.join(self.dir_name, os.path.dirname(file_name))
+            os.makedirs(extract_path, exist_ok=True)
+            try:
+                with py7zr.SevenZipFile(seven_zip_file, 'r') as seven_zip_ref:
+                    seven_zip_ref.extract(targets=[file_name], path=extract_path)  # Извлекаем файл
+                extracted_file_path: str = os.path.join(extract_path, file_name)
+                self.process_archive(extracted_file_path)
+            except Exception as ex:
+                self.logger.error(f"Ошибка при извлечении файла {file_name}: {ex}")
 
     def unrar_archive(self, rar_file: str) -> None:
         """
