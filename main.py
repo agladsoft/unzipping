@@ -110,19 +110,27 @@ class DataExtractor:
             self.logger.error(f"Probability of header is {probability_of_header}. Columns is {row}")
         return len(row), probability_of_header
 
-    @staticmethod
-    def get_unique_filename(target_dir: str, base_name: str) -> str:
+    def get_unique_filename(self, target_dir: str, base_name: str) -> str:
         """
-        Checks the existence of the file and adds a suffix (_1, _2, etc.) if it already exists.
+        Checks the existence of the file and adds a suffix (_1, _2, etc.) if the file with the same name exists
+        but has a different size. If the file with the same name and size exists, it will be overwritten.
         :param target_dir: Target directory.
         :param base_name: The original file name.
         :return: Unique file name.
         """
         dest_path: str = os.path.join(target_dir, base_name)
 
+        # Check if the file exists and if the size is the same
         if os.path.exists(dest_path):
+            original_size: int = os.path.getsize(dest_path)
+            current_size: int = os.path.getsize(self.filename)
+
+            if original_size == current_size:
+                return dest_path  # Overwrite if the size is the same
+
+            # If sizes differ, find a new filename with a counter suffix
             base, ext = os.path.splitext(base_name)
-            counter = 1
+            counter: int = 1
             while os.path.exists(os.path.join(target_dir, f"{base}_{counter}{ext}")):
                 counter += 1
             dest_path = os.path.join(target_dir, f"{base}_{counter}{ext}")
@@ -236,7 +244,7 @@ class DataExtractor:
             for cell in rows[i:]:
                 if cell and cell.strip():
                     cell: str = self._remove_many_spaces(cell, is_remove_spaces=False)
-                    if count_address in col_map:
+                    if count_address in col_map and context.get(columns[col_map[count_address]]):
                         context[columns[col_map[count_address]]] += f" {cell}"
                     break
 
@@ -272,7 +280,7 @@ class DataExtractor:
         :param range_index:
         :return:
         """
-        splitter_column: list = row.split(":")
+        splitter_column: list = re.split(r'[:：]', row)
         key_cleaned: str = self._remove_spaces_and_symbols(row)
 
         for uni_columns, columns in DICT_LABELS.items():
@@ -293,7 +301,8 @@ class DataExtractor:
         """
         for key, value in range_index.items():
             cells: list = rows[value[0]:value[-1] - 1]
-            cell: Optional[str] = max(filter(None, cells), key=len, default=None)
+            cell: Optional[str] = next((x for x in cells if x is not None), None) \
+                if key == "destination_station" else max(filter(None, cells), key=len, default=None)
 
             if not cell or not cell.strip() or self._is_digit(cell):
                 continue
