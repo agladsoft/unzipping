@@ -36,8 +36,7 @@ class UnifiedCompaniesManager:
     @staticmethod
     def get_valid_company(unified_company, company_data):
         with contextlib.suppress(Exception):
-            if unified_company.is_valid(company_data):
-                return unified_company
+            return unified_company if unified_company.is_valid(company_data) else None
 
     @staticmethod
     def fetch_company_name(df, company, taxpayer_id):
@@ -278,7 +277,7 @@ class UnifiedKazakhstanCompanies(BaseUnifiedCompanies):
 
     @staticmethod
     def multiply(weights: List[int], number: str) -> int:
-        return reduce(add, map(lambda i: mul(*i), zip(map(int, number), weights)))
+        return reduce(add, map(lambda i: mul(*i), zip(map(int, number), weights))) # type: ignore
 
     def is_valid(self, number):
         if len(number) != 12:
@@ -312,6 +311,7 @@ class UnifiedKazakhstanCompanies(BaseUnifiedCompanies):
             logger.info(f"Company name is {company_name}. BIN is {taxpayer_id}")
             self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
             return company_name
+        return None
 
 
 class UnifiedBelarusCompanies(BaseUnifiedCompanies):
@@ -358,6 +358,7 @@ class UnifiedBelarusCompanies(BaseUnifiedCompanies):
             logger.info(f"Company name is {data['company_name']}. UNP is {taxpayer_id}")
             self.cache_add_and_save(taxpayer_id, data['company_name'], self.__str__())
             return data['company_name']
+        return None
 
 
 class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
@@ -394,6 +395,7 @@ class UnifiedUzbekistanCompanies(BaseUnifiedCompanies):
                 company_name = name
             self.cache_add_and_save(taxpayer_id, company_name, self.__str__())
             return company_name
+        return None
 
 
 class SearchEngineParser(BaseUnifiedCompanies):

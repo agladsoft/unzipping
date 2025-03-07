@@ -70,7 +70,9 @@ def get_file_handler(name: str) -> logging.FileHandler:
     if not os.path.exists(log_dir_name):
         os.mkdir(log_dir_name)
     file_handler: RotatingFileHandler = RotatingFileHandler(
-        filename=f"{log_dir_name}/{name}.log", mode='a', maxBytes=10.5 * pow(1024, 2),
+        filename=f"{log_dir_name}/{name}.log",
+        mode='a',
+        maxBytes=10 * pow(1024, 2),
         backupCount=3
     )
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FTM))
@@ -113,6 +115,6 @@ class MissingEnvironmentVariable(Exception):
 
 
 DICT_LABELS: dict = read_config_table("labels_before_table")
-HEADER_LABELS: list = list(DICT_LABELS)[:6]
+HEADER_LABELS: list = list(DICT_LABELS)
 DICT_HEADERS_COLUMN_ENG: dict = read_config_table("headers_table")
 DICT_STATION: dict = read_config_table("station")

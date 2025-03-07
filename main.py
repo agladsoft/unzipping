@@ -61,15 +61,19 @@ class DataExtractor:
         """
         Understanding when a headerless table starts.
         """
-        number_pp_index: Optional[int] = self.dict_columns_position.get("number_pp")
+        number_pp_index: Optional[int] = self.dict_columns_position["number_pp"]
+        tnved_code_index: Optional[int] = self.dict_columns_position["tnved_code"]
 
         return (
             self.dict_columns_position["model"] or
             self.dict_columns_position["country_of_origin"] or
             (number_pp_index is not None and self._is_digit(row[number_pp_index])) or
             self.dict_columns_position["goods_description"]
-        ) and row[self.dict_columns_position["tnved_code"]] \
-            and any(char.isdigit() for char in row[self.dict_columns_position["tnved_code"]])
+        ) and (
+            tnved_code_index is not None and
+            row[tnved_code_index] and
+            any(char.isdigit() for char in row[tnved_code_index])
+        )
 
     def _remove_spaces_and_symbols(self, row: str) -> str:
         """
@@ -192,7 +196,7 @@ class DataExtractor:
             for uni_columns, columns in DICT_HEADERS_COLUMN_ENG.items():
                 for column_eng in columns:
                     if column == column_eng:
-                        self.dict_columns_position[uni_columns] = index
+                        self.dict_columns_position[uni_columns] = self.dict_columns_position[uni_columns] or index
         self.logger.info(f"Columns position is {self.dict_columns_position}")
 
     def is_all_right_columns(self, context: dict) -> bool:
@@ -286,7 +290,7 @@ class DataExtractor:
         for uni_columns, columns in DICT_LABELS.items():
             if key_cleaned in columns:
                 if range_index:
-                    range_index[next(reversed(range_index))].append(index)
+                    range_index[next(reversed(range_index))].append(index - 1)
                 range_index.setdefault(uni_columns, []).append(index)
             elif self._remove_spaces_and_symbols(splitter_column[0]) in columns:
                 context[uni_columns] = " ".join(splitter_column[1:]).strip() or splitter_column[-1].strip()
@@ -300,14 +304,16 @@ class DataExtractor:
         :return:
         """
         for key, value in range_index.items():
-            cells: list = rows[value[0]:value[-1] - 1]
-            cell: Optional[str] = next((x for x in cells if x is not None), None) \
-                if key == "destination_station" else max(filter(None, cells), key=len, default=None)
+            cells: list = rows[value[0]:value[-1]]
+            cells = [self._remove_many_spaces(cell, is_remove_spaces=False) for cell in cells]
+            cell: Optional[str] = next((x for x in cells if x and not self._is_digit(x)), None) \
+                if key in ["container_number", "destination_station", "delivery_terms"] \
+                else max((x for x in cells if x), key=len, default=None)
 
-            if not cell or not cell.strip() or self._is_digit(cell):
+            if not cell or not cell.strip():
                 continue
 
-            context.setdefault(key, self._remove_many_spaces(cell, is_remove_spaces=False))
+            context.setdefault(key, cell)
 
     def _get_content_in_table(self, rows: list, list_data: List[dict], context: dict) -> None:
         """
@@ -352,7 +358,7 @@ class DataExtractor:
                 len_rows, coefficient = self._get_probability_of_header(rows, self._get_list_columns())
                 if coefficient >= COEFFICIENT_OF_HEADER_PROBABILITY and len_rows >= LEN_COLUMNS_IN_ROW:
                     if not self.is_all_right_columns(context):
-                        return
+                        return None
                     UnifiedContextProcessor.unified_values(context, df)
                     self._get_columns_position(rows)
                 elif self._is_table_starting(rows):
@@ -434,7 +440,7 @@ class ArchiveExtractor:
         :return:
         """
         if file_info.is_dir():
-            return
+            return None
         extract_to = os.path.dirname(file_info.filename)
         inner_archive_filename = os.path.join(self.dir_name, extract_to, os.path.basename(file_info.filename))
         os.makedirs(os.path.dirname(inner_archive_filename), exist_ok=True)
@@ -446,6 +452,7 @@ class ArchiveExtractor:
             return inner_archive_filename
         except Exception as ex:
             self.logger.error(f"Ошибка при извлечении файла {file_info.filename}: {ex}")
+            return None
 
     def into_dirs(self, dir_name: str) -> None:
         """
