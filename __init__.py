@@ -43,11 +43,14 @@ PREFIX_TEMPLATE: dict = {
 }
 
 PROXIES: list = [
-    'http://user139922:oulrqa@181.215.227.151:1866',
-    'http://user139922:oulrqa@181.215.227.145:1866',
-    'http://user139922:oulrqa@181.215.227.225:1866',
-    'http://user139922:oulrqa@181.215.227.93:1866',
-    'http://user139922:oulrqa@181.215.227.198:1866'
+    'http://user139922:oulrqa@166.1.108.56:6573',
+    'http://user139922:oulrqa@166.1.108.146:6573',
+    'http://user139922:oulrqa@166.1.29.178:6573',
+    'http://user139922:oulrqa@166.1.108.52:6573',
+    'http://user139922:oulrqa@194.169.161.227:6573',
+    'http://user139922:oulrqa@194.169.161.208:6573',
+    'http://user139922:oulrqa@185.198.233.102:6573',
+    'http://user139922:oulrqa@185.198.233.213:6573'
 ]
 CYCLED_PROXIES: cycle = cycle(PROXIES)
 
