@@ -133,25 +133,40 @@ class BaseUnifiedCompanies(abc.ABC):
         self.conn.commit()
         return cur
 
-    @staticmethod
-    def get_response(url, country, method="GET", data=None):
+    def get_response(self, url, country, method="GET", data=None, use_proxy=True) -> Optional[Response]:
+        """
+        Sending a request to the API.
+        :param url:
+        :param country:
+        :param method:
+        :param data:
+        :param use_proxy:
+        :return:
+        """
         response: Optional[Response] = None
-        proxy: str = next(CYCLED_PROXIES)
+        proxy: Optional[str] = next(CYCLED_PROXIES) if use_proxy else None
         used_proxy: Optional[str] = None
         try:
             session: Session = requests.Session()
-            session.proxies = {"http": proxy}
+            if use_proxy:
+                session.proxies = {"https": proxy}
+                used_proxy = proxy
             if method == "POST":
                 response = session.post(url, json=data, timeout=120)
             else:
                 response = session.get(url, timeout=120)
             logger.info(f"Статус запроса {response.status_code}. URL - {url}. Country - {country}")
-            used_proxy = session.proxies.get('http')  # или 'https', в зависимости от протокола
-            logger.info(f'Использованный прокси: {used_proxy}')
+            logger.info(f'Использованный прокси: {used_proxy if use_proxy else "Без прокси"}')
             response.raise_for_status()
             return response
         except requests.exceptions.RequestException as e:
-            logger.error(f"An error occurred during the API request - {e}. Proxy - {used_proxy}.Text - {response.text}")
+            logger.error(
+                f"Ошибка API-запроса - {e}. Proxy - {used_proxy}. Text - {response.text if response else 'No response'}"
+            )
+            if use_proxy:
+                logger.info("Повторный запрос без прокси...")
+                return self.get_response(url, country, method, data, use_proxy=False)
+            return None  # Если ошибка без прокси, просто возвращаем None
 
     def cache_add_and_save(self, taxpayer_id: str, company_name: str, country: str) -> None:
         """
